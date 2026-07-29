@@ -125,10 +125,12 @@ namespace Cinder.Tests
             Assert.AreEqual(10f, results[0].Spec.Damage, "移除修饰符后应回到基础伤害");
 
             wand.Tick(0.6f); // 推进冷却与充能，准备下一次施法
-            Assert.IsTrue(wand.SetSpell(0, modifier)); // 装回
+            // SetSpell 是替换语义：先替换 0 槽为修饰符，再把投射物追加回 1 槽
+            Assert.IsTrue(wand.SetSpell(0, modifier));
+            Assert.IsTrue(wand.SetSpell(1, bolt));
             Assert.IsTrue(wand.TryCast(results));
             Assert.AreEqual(15f, results[0].Spec.Damage);
-            Assert.AreEqual(2, changes);
+            Assert.AreEqual(3, changes);
         }
 
         [Test]

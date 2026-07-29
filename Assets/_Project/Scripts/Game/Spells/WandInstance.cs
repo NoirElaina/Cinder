@@ -10,6 +10,9 @@ namespace Cinder.Game.Spells
     {
         public ProjectileSpec Spec;
         public IProjectileBehavior Behavior;
+
+        /// <summary>相对瞄准方向的扇形偏转角（度），多重施法产生。</summary>
+        public float AngleOffset;
     }
 
     /// <summary>
@@ -100,20 +103,47 @@ namespace Cinder.Game.Spells
             float manaCost = 0f;
             IProjectileBehavior chain = BaseProjectileBehavior.Instance;
             var pending = new List<CastResult>(slots.Count);
+            int multicast = 0;
+            float multicastSpread = 0f;
 
             foreach (SpellDefinition spell in slots)
             {
                 if (spell == null) continue;
                 manaCost += spell.ManaCost;
-                if (spell is ModifierSpellDefinition modifier)
+                if (spell is MulticastSpellDefinition multi)
+                {
+                    multicast += multi.Count;
+                    multicastSpread = UnityEngine.Mathf.Max(multicastSpread, multi.SpreadStep);
+                }
+                else if (spell is ModifierSpellDefinition modifier)
                 {
                     chain = modifier.Decorate(chain);
+                }
+                else if (spell is TriggerSpellDefinition trigger && trigger.Payload != null)
+                {
+                    ProjectileSpec carrier = trigger.CarrierSpec;
+                    chain.ModifySpec(ref carrier);
+                    carrier.TriggerPayload = trigger.Payload;
+                    pending.Add(new CastResult { Spec = carrier, Behavior = chain });
                 }
                 else if (spell is ProjectileSpellDefinition projectile)
                 {
                     ProjectileSpec spec = projectile.BaseSpec;
                     chain.ModifySpec(ref spec);
-                    pending.Add(new CastResult { Spec = spec, Behavior = chain });
+                    int copies = System.Math.Max(1, multicast);
+                    multicast = 0; // 只作用于紧随的投射物法术
+                    for (int i = 0; i < copies; i++)
+                    {
+                        float offset = copies == 1
+                            ? 0f
+                            : (i - (copies - 1) * 0.5f) * multicastSpread;
+                        pending.Add(new CastResult
+                        {
+                            Spec = spec,
+                            Behavior = chain,
+                            AngleOffset = offset,
+                        });
+                    }
                 }
             }
 

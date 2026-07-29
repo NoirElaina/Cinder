@@ -79,6 +79,14 @@ namespace Cinder.Runtime.Materials
 
         public string GetName(ushort id) => names[id] ?? $"#{id}";
 
+        /// <summary>释放原生查找表（可重复调用）。资产常驻内存，
+        /// 使用方（如 WorldController）应在退出 Play 时调用以避免 NativeArray 泄漏。</summary>
+        public void DisposeTable()
+        {
+            Table?.Dispose();
+            Table = null;
+        }
+
         /// <summary>纯代码构建内置物质库，查看器零资产可跑。</summary>
         public static MaterialDatabase CreateDefault()
         {
@@ -99,6 +107,14 @@ namespace Cinder.Runtime.Materials
                     colors: C(110, 70, 40, 95, 60, 32, 124, 80, 46)),
                 Make(BuiltinMaterials.Fire, "火焰", MatterType.Fire, 5, fluidity: 160, baseLife: 40,
                     colors: C(250, 180, 40, 245, 120, 20, 255, 220, 90, 235, 80, 10)),
+                Make(BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 210,
+                    colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26)),
+                Make(BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
+                    colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95)),
+                Make(BuiltinMaterials.Steam, "蒸汽", MatterType.Gas, 10, fluidity: 180,
+                    colors: C(200, 200, 205, 215, 215, 220)),
+                Make(BuiltinMaterials.Smoke, "烟", MatterType.Gas, 15, fluidity: 120, baseLife: 150,
+                    colors: C(90, 90, 95, 105, 105, 110, 75, 75, 80)),
             };
             db.Rebuild();
             return db;
@@ -130,7 +146,7 @@ namespace Cinder.Runtime.Materials
 
         void OnDestroy()
         {
-            Table?.Dispose();
+            DisposeTable();
         }
     }
 }

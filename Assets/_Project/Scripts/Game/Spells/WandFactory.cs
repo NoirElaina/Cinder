@@ -22,6 +22,13 @@ namespace Cinder.Game.Spells
 
         public static WandInstance CreateDefault()
         {
+            var multicast = ScriptableObject.CreateInstance<MulticastSpellDefinition>();
+            multicast.ModuleId = "spell.multicast2";
+            multicast.DisplayName = "双重施法";
+            multicast.ManaCost = 4f;
+            multicast.Count = 2;
+            multicast.SpreadStep = 8f;
+
             var trail = ScriptableObject.CreateInstance<TrailEffect>();
             trail.ModuleId = "effect.fire_trail";
             trail.DisplayName = "火焰拖尾";
@@ -57,6 +64,7 @@ namespace Cinder.Game.Spells
             wand.ManaMax = 120f;
             wand.ManaRegen = 25f;
             wand.Capacity = 6;
+            wand.DefaultSpells.Add(multicast);
             wand.DefaultSpells.Add(fireTrailSpell);
             wand.DefaultSpells.Add(spark);
 

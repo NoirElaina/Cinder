@@ -24,10 +24,12 @@ namespace Cinder.Runtime.World
         {
             BuiltinMaterials.Sand, BuiltinMaterials.Water, BuiltinMaterials.Dirt,
             BuiltinMaterials.Rock, BuiltinMaterials.Wood, BuiltinMaterials.Fire,
-            BuiltinMaterials.Bedrock,
+            BuiltinMaterials.Bedrock, BuiltinMaterials.Oil, BuiltinMaterials.Acid,
+            BuiltinMaterials.Smoke,
         };
 
         MaterialDatabase db;
+        bool ownsDatabase;
         WorldStreamer streamer;
         SimulationEngine engine;
         ChunkViewPool pool;
@@ -49,7 +51,7 @@ namespace Cinder.Runtime.World
         void Awake()
         {
             Instance = this;
-            db = MaterialDatabase.CreateDefault();
+            db = GameContent.LoadMaterials(out ownsDatabase);
             streamer = new WorldStreamer(seed, db);
             engine = new SimulationEngine(streamer.Window, db.Table, seed);
             db.Rebuilt += OnMaterialsRebuilt;
@@ -146,6 +148,9 @@ namespace Cinder.Runtime.World
             else if (kb.digit5Key.wasPressedThisFrame) brushMaterial = BrushOrder[4];
             else if (kb.digit6Key.wasPressedThisFrame) brushMaterial = BrushOrder[5];
             else if (kb.digit7Key.wasPressedThisFrame) brushMaterial = BrushOrder[6];
+            else if (kb.digit8Key.wasPressedThisFrame) brushMaterial = BrushOrder[7];
+            else if (kb.digit9Key.wasPressedThisFrame) brushMaterial = BrushOrder[8];
+            else if (kb.digit0Key.wasPressedThisFrame) brushMaterial = BrushOrder[9];
         }
 
         void HandleEditInput()
@@ -245,7 +250,12 @@ namespace Cinder.Runtime.World
             if (player != null)
             {
                 GUILayout.Label($"生命 {player.Character.CurrentHealth:F0}   法力 {player.Wand.CurrentMana:F0}   状态 {player.Character.Fsm.Current?.Name}");
-                GUILayout.Label("AD 移动 / 空格跳 / 左键施法 / 右键挖 / Shift+右键放 / F 自由视角");
+                var equipped = new System.Text.StringBuilder("装备:");
+                foreach (string slot in player.Equipment.Slots)
+                    equipped.Append(' ').Append(player.Equipment.Get(slot)?.DisplayName);
+                if (equipped.Length == 3) equipped.Append(" (G 戒指 / H 核心)");
+                GUILayout.Label(equipped.ToString());
+                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)} (1-0)   AD走/空格跳/左键施法/右键挖/Shift+右键放/F自由视角");
             }
             else
             {
@@ -258,10 +268,15 @@ namespace Cinder.Runtime.World
         void OnDestroy()
         {
             if (Instance == this) Instance = null;
-            if (db != null) db.Rebuilt -= OnMaterialsRebuilt;
             streamer?.SaveAll();
             streamer?.Dispose();
-            if (db != null) Destroy(db);
+            if (db != null)
+            {
+                db.Rebuilt -= OnMaterialsRebuilt;
+                // 资产常驻，仅释放原生表；代码创建的实例才销毁
+                db.DisposeTable();
+                if (ownsDatabase) Destroy(db);
+            }
         }
     }
 }

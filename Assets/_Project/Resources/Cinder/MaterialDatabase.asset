@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1aa4d90d2a77a6c41818fdfa37ab73d0, type: 3}
+  m_Name: MaterialDatabase
+  m_EditorClassIdentifier: Cinder.Runtime::Cinder.Runtime.Materials.MaterialDatabase
+  materials:
+  - {fileID: 11400000, guid: a708bb03f0024d0aac59e6e1b0f060bc, type: 2}
+  - {fileID: 11400000, guid: d3732b17db2a42c0bab5ffefdb0a3154, type: 2}
+  - {fileID: 11400000, guid: 9e3a5228fb7e48c3967ad0f4c19d9b19, type: 2}
+  - {fileID: 11400000, guid: ab4c034c19154e8c89611354a1feaccf, type: 2}
+  - {fileID: 11400000, guid: 117dd28b81a8444a83829ca4f2137e68, type: 2}
+  - {fileID: 11400000, guid: 05c16352374f4d649a59bee41b31c46e, type: 2}
+  - {fileID: 11400000, guid: d1bcf84393744512bbbaab02f212fe07, type: 2}
+  - {fileID: 11400000, guid: a402e24929f24b87a11a0cf4356751fa, type: 2}
+  - {fileID: 11400000, guid: 0f4ce697f6c14795b3c2197992a40a66, type: 2}
+  - {fileID: 11400000, guid: 1677e559900e4722a23b301df31a454e, type: 2}
+  - {fileID: 11400000, guid: c7b60e6909d04d4cba02f672251c65b4, type: 2}

@@ -43,6 +43,10 @@ namespace Cinder.Simulation
         public const ushort Water = 5;
         public const ushort Wood = 6;
         public const ushort Fire = 7;
+        public const ushort Oil = 8;
+        public const ushort Acid = 9;
+        public const ushort Steam = 10;
+        public const ushort Smoke = 11;
 
         public const ushort CustomBase = 16;
     }
@@ -112,6 +116,14 @@ namespace Cinder.Simulation
                 { Type = MatterType.StaticSolid, Density = 150, Flammability = 180 });
             table.Set(BuiltinMaterials.Fire, new MaterialProps
                 { Type = MatterType.Fire, Density = 5, Fluidity = 160, BaseLife = 40 });
+            table.Set(BuiltinMaterials.Oil, new MaterialProps
+                { Type = MatterType.Liquid, Density = 90, Fluidity = 200, Flammability = 210 });
+            table.Set(BuiltinMaterials.Acid, new MaterialProps
+                { Type = MatterType.Liquid, Density = 110, Fluidity = 210 });
+            table.Set(BuiltinMaterials.Steam, new MaterialProps
+                { Type = MatterType.Gas, Density = 10, Fluidity = 180 });
+            table.Set(BuiltinMaterials.Smoke, new MaterialProps
+                { Type = MatterType.Gas, Density = 15, Fluidity = 120, BaseLife = 150 });
             return table;
         }
     }

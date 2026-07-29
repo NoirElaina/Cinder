@@ -22,6 +22,9 @@ namespace Cinder.Game.Effects
         public ushort TrailMaterial;
 
         public Color32 Tint;
+
+        /// <summary>命中后释放的载荷法术（触发弹），运行时清空防递归。</summary>
+        public Spells.ProjectileSpellDefinition TriggerPayload;
     }
 
     /// <summary>

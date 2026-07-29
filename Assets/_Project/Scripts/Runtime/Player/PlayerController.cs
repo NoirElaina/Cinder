@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Cinder.Game.Characters;
+using Cinder.Game.Items;
 using Cinder.Game.Physics;
 using Cinder.Game.Spells;
 using Cinder.Runtime.Combat;
@@ -25,6 +26,11 @@ namespace Cinder.Runtime.Player
 
         public Character Character { get; private set; }
         public WandInstance Wand { get; private set; }
+        public Inventory Inventory { get; private set; }
+        public Equipment Equipment { get; private set; }
+
+        ItemDefinition demoRing;
+        ItemDefinition demoCore;
 
         /// <summary>自由视角时置 false：人物不再响应移动/开火，但仍受物理模拟。</summary>
         public bool InputEnabled { get; set; } = true;
@@ -42,15 +48,21 @@ namespace Cinder.Runtime.Player
             player.cam = cam;
             player.spriteRenderer = sr;
 
-            var definition = ScriptableObject.CreateInstance<CharacterDefinition>();
-            definition.ModuleId = "character.player";
-            definition.DisplayName = "玩家";
-            definition.MaxHealth = 100f;
-            definition.MoveSpeed = 22f;
-            definition.JumpStrength = 38f;
-            player.Character = new Character(definition);
+            player.Character = new Character(GameContent.LoadPlayerCharacter());
             player.body = new PixelBody(new WindowCellSampler(streamer), feetPosition);
-            player.Wand = WandFactory.CreateDefault();
+            player.Wand = GameContent.LoadStarterWand();
+
+            // 演示物品：入包 + 装备系统（属性修饰按 wand. 前缀路由）
+            player.Inventory = new Inventory(12);
+            ItemDefinition[] starterItems = GameContent.LoadStarterItems();
+            player.demoRing = starterItems[0];
+            player.demoCore = starterItems[1];
+            player.Inventory.Add(player.demoRing);
+            player.Inventory.Add(player.demoCore);
+            player.Equipment = new Equipment(attribute =>
+                attribute != null && attribute.StartsWith("wand.")
+                    ? player.Wand.Attributes
+                    : player.Character.Attributes);
             return player;
         }
 
@@ -80,6 +92,7 @@ namespace Cinder.Runtime.Player
             {
                 HandleMovement(dt);
                 HandleFire();
+                HandleItems();
             }
             else
             {
@@ -126,10 +139,32 @@ namespace Cinder.Runtime.Player
 
             if (Wand.TryCast(castResults))
             {
+                Vector2 baseDirection = direction.normalized;
                 foreach (CastResult result in castResults)
-                    Projectile.Spawn(streamer, result.Behavior, result.Spec,
-                        body.Center, direction.normalized);
+                {
+                    Vector2 dir = result.AngleOffset != 0f
+                        ? Quaternion.Euler(0f, 0f, result.AngleOffset) * baseDirection
+                        : baseDirection;
+                    Projectile.Spawn(streamer, result.Behavior, result.Spec, body.Center, dir);
+                }
             }
+        }
+
+        void HandleItems()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb == null) return;
+            if (kb.gKey.wasPressedThisFrame) ToggleEquip(demoRing);
+            if (kb.hKey.wasPressedThisFrame) ToggleEquip(demoCore);
+        }
+
+        void ToggleEquip(ItemDefinition item)
+        {
+            if (item == null) return;
+            if (Equipment.Get(item.EquipSlot) != null)
+                Equipment.Unequip(item.EquipSlot);
+            else
+                Equipment.Equip(item);
         }
 
         void UpdateFsm()

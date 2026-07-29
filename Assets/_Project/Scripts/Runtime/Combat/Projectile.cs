@@ -90,6 +90,15 @@ namespace Cinder.Runtime.Combat
             behavior.OnHitWorld(ref spec, cellX, cellY, streamer.GetMaterialAt(cellX, cellY));
             if (spec.DigPower > 0)
                 streamer.EditSphere(cellX, cellY, spec.DigPower, 0);
+
+            // 触发弹：在命中点向下释放载荷法术（清空 TriggerPayload，不递归）
+            if (spec.TriggerPayload != null)
+            {
+                ProjectileSpec payload = spec.TriggerPayload.BaseSpec;
+                payload.TriggerPayload = null;
+                Spawn(streamer, BaseProjectileBehavior.Instance, payload,
+                    new Vector2(cellX + 0.5f, cellY + 0.5f), Vector2.down);
+            }
             Destroy(gameObject);
         }
     }

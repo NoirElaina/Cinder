@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5ce6fb51501550b458391c927a9e2554, type: 3}
+  m_Name: Mat_Oil
+  m_EditorClassIdentifier: Cinder.Runtime::Cinder.Runtime.Materials.MaterialDefinition
+  Id: 8
+  DisplayName: "\u6CB9"
+  Type: 3
+  Density: 90
+  Fluidity: 200
+  Flammability: 210
+  BaseLife: 0
+  Palette:
+  - serializedVersion: 2
+    rgba: 4280165165
+  - serializedVersion: 2
+    rgba: 4280298039
+  - serializedVersion: 2
+    rgba: 4279901734

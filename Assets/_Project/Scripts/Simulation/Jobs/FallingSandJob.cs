@@ -54,13 +54,13 @@ namespace Cinder.Simulation.Jobs
         {
             int index = y * Width + x;
             int chunkIndex = ChunkIndexOf(x, y);
-            if (Awake[chunkIndex] == 0) return;
-
             Cell c = Write[index];
             if (c.MaterialId == BuiltinMaterials.Empty) return;
+            MaterialProps p = Mats[c.MaterialId];
+            // 休眠区块只跳过无寿命物质；有寿命的（烟/火）必须继续衰减
+            if (Awake[chunkIndex] == 0 && p.BaseLife == 0) return;
             if ((c.Flags & Cell.FlagMoved) != 0) return;
 
-            MaterialProps p = Mats[c.MaterialId];
             switch (p.Type)
             {
                 case MatterType.Powder:
@@ -87,8 +87,22 @@ namespace Cinder.Simulation.Jobs
             TryMove(x, y, x - first, y - 1, c, p);
         }
 
-        void StepFluid(int x, int y, in Cell c, in MaterialProps p, int dirY)
+        void StepFluid(int x, int y, Cell c, in MaterialProps p, int dirY)
         {
+            // 有寿命的气体（烟等）先衰减，耗尽即消散
+            if (dirY == 1 && p.BaseLife > 0)
+            {
+                int index = y * Width + x;
+                if (c.State <= 1)
+                {
+                    Write[index] = default;
+                    Moved[ChunkIndexOf(x, y)]++;
+                    return;
+                }
+                c.State -= 1;
+                Write[index] = c;
+            }
+
             if (TryMove(x, y, x, y + dirY, c, p)) return;
             uint h = SimHash.Hash(x, y, Tick, Seed);
             int first = (h & 1u) == 0u ? -1 : 1;
@@ -109,8 +123,8 @@ namespace Cinder.Simulation.Jobs
             int index = y * Width + x;
             uint h = SimHash.Hash(x, y, Tick, Seed);
 
-            // 邻水概率熄灭
-            if (TouchingType(x, y, MatterType.Liquid) && ((h >> 3) & 1u) == 0u)
+            // 邻不可燃液体（水等）概率熄灭；油等易燃液体不灭火
+            if (TouchingExtinguisher(x, y) && ((h >> 3) & 1u) == 0u)
             {
                 Write[index] = default;
                 Moved[ChunkIndexOf(x, y)]++;
@@ -166,7 +180,7 @@ namespace Cinder.Simulation.Jobs
             Moved[ChunkIndexOf(x, y)]++;
         }
 
-        bool TouchingType(int x, int y, MatterType type)
+        bool TouchingExtinguisher(int x, int y)
         {
             for (int dy = -1; dy <= 1; dy++)
             {
@@ -176,7 +190,9 @@ namespace Cinder.Simulation.Jobs
                     int nx = x + dx, ny = y + dy;
                     if (nx < 0 || nx >= Width || ny < 0 || ny >= Height) continue;
                     ushort id = Write[ny * Width + nx].MaterialId;
-                    if (id != BuiltinMaterials.Empty && Mats[id].Type == type) return true;
+                    if (id == BuiltinMaterials.Empty) continue;
+                    MaterialProps np = Mats[id];
+                    if (np.Type == MatterType.Liquid && np.Flammability == 0) return true;
                 }
             }
             return false;
@@ -197,10 +213,10 @@ namespace Cinder.Simulation.Jobs
             else
             {
                 MaterialProps tp = Mats[target.MaterialId];
-                // 密度置换：重的可以沉入轻的流体/火焰
+                // 密度置换：重的可以沉入轻的流体。
+                // 火焰不可被置换——否则油会流进火里把火挤走，链式燃烧会中断。
                 canOccupy = (tp.Type == MatterType.Liquid
-                    || tp.Type == MatterType.Gas
-                    || tp.Type == MatterType.Fire)
+                    || tp.Type == MatterType.Gas)
                     && tp.Density < p.Density;
             }
             if (!canOccupy) return false;

@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3278910d87204cab8cd4786d8c873b53, type: 3}
+  m_Name: Spell_SparkBolt
+  m_EditorClassIdentifier: Cinder.Game::Cinder.Game.Spells.ProjectileSpellDefinition
+  moduleId: spell.spark_bolt
+  displayName: "\u706B\u82B1\u5F39"
+  ManaCost: 5

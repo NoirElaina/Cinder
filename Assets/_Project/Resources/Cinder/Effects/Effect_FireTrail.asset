@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9bd5c357741812d4bb609ddfd6445029, type: 3}
+  m_Name: Effect_FireTrail
+  m_EditorClassIdentifier: Cinder.Game::Cinder.Game.Effects.TrailEffect
+  moduleId: effect.fire_trail
+  displayName: "\u706B\u7130\u62D6\u5C3E"
+  TrailMaterial: 7

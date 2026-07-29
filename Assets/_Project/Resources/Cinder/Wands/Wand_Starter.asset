@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bc030d5d24d811149ac690169a4bc193, type: 3}
+  m_Name: Wand_Starter
+  m_EditorClassIdentifier: Cinder.Game::Cinder.Game.Spells.WandDefinition
+  moduleId: wand.starter
+  displayName: "\u5B66\u5F92\u6CD5\u6756"
+  CastDelay: 0.18
+  RechargeTime: 0.35
+  ManaMax: 120
+  ManaRegen: 25
+  Capacity: 6
+  DefaultSpells:
+  - {fileID: 11400000, guid: cd0c0464fc784fbab5b617332aaf9b99, type: 2}
+  - {fileID: 11400000, guid: d30446d8a9eb4d28b085978240e80507, type: 2}
+  - {fileID: 11400000, guid: a424863f30f84058bcea6b59db054ca8, type: 2}
