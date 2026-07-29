@@ -17,7 +17,7 @@ MonoBehaviour:
   Type: 1
   Density: 150
   Fluidity: 0
-  Flammability: 180
+  Flammability: 18
   BaseLife: 0
   Palette:
   - serializedVersion: 2

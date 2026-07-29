@@ -46,11 +46,11 @@ namespace Cinder.EditorTools
                 colors: C(210, 185, 130, 200, 175, 120, 222, 197, 142));
             var water = Mat("Mat_Water", BuiltinMaterials.Water, "水", MatterType.Liquid, 100, fluidity: 220,
                 colors: C(45, 110, 220, 40, 100, 210, 60, 125, 235));
-            var wood = Mat("Mat_Wood", BuiltinMaterials.Wood, "木头", MatterType.StaticSolid, 150, flammability: 180,
+            var wood = Mat("Mat_Wood", BuiltinMaterials.Wood, "木头", MatterType.StaticSolid, 150, flammability: 18,
                 colors: C(110, 70, 40, 95, 60, 32, 124, 80, 46));
             var fire = Mat("Mat_Fire", BuiltinMaterials.Fire, "火焰", MatterType.Fire, 5, fluidity: 160, baseLife: 40,
                 colors: C(250, 180, 40, 245, 120, 20, 255, 220, 90, 235, 80, 10));
-            var oil = Mat("Mat_Oil", BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 210,
+            var oil = Mat("Mat_Oil", BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 60,
                 colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26));
             var acid = Mat("Mat_Acid", BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
                 colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95));
@@ -73,6 +73,8 @@ namespace Cinder.EditorTools
             smoke.Conductivity = 20;
             fire.Conductivity = 60;
             fire.SelfTempK = 1073;
+            // 火焰熄灭时有概率留下烟（落沙 Job 的燃尽产物字段）
+            fire.BurnsInto = smoke;
             lava.Conductivity = 100;
             lava.SelfTempK = 1400;
             wood.Conductivity = 40;

@@ -26,6 +26,9 @@ namespace Cinder.Simulation.Jobs
         public uint Seed;
         public ushort FireId;
 
+        /// <summary>火焰熄灭/被扑灭时留下 BurnsInto 产物（烟）的概率权重（/255）。</summary>
+        const byte SmokeOnDeathChance = 64;
+
         public void Execute()
         {
             for (int i = 0; i < Read.Length; i++)
@@ -126,20 +129,18 @@ namespace Cinder.Simulation.Jobs
             // 邻不可燃液体（水等）概率熄灭；油等易燃液体不灭火
             if (TouchingExtinguisher(x, y) && ((h >> 3) & 1u) == 0u)
             {
-                Write[index] = default;
-                Moved[ChunkIndexOf(x, y)]++;
+                Extinguish(x, y, index, in p, h);
                 return;
             }
 
             int life = c.State - 1;
             if (life <= 0)
             {
-                Write[index] = default;
-                Moved[ChunkIndexOf(x, y)]++;
+                Extinguish(x, y, index, in p, h);
                 return;
             }
 
-            // 点燃邻居
+            // 点燃邻居：向上蔓延最快、水平次之、向下最慢（Noita 式火舌上舔）
             for (int dy = -1; dy <= 1; dy++)
             {
                 for (int dx = -1; dx <= 1; dx++)
@@ -152,7 +153,10 @@ namespace Cinder.Simulation.Jobs
                     if (t.MaterialId == BuiltinMaterials.Empty) continue;
                     MaterialProps tp = Mats[t.MaterialId];
                     if (tp.Flammability == 0) continue;
-                    if (((SimHash.Hash(nx, ny, Tick, Seed) >> 4) & 0xFFu) >= tp.Flammability) continue;
+                    uint threshold = dy > 0
+                        ? tp.Flammability
+                        : dy == 0 ? (uint)(tp.Flammability / 2) : (uint)(tp.Flammability / 4);
+                    if (((SimHash.Hash(nx, ny, Tick, Seed) >> 4) & 0xFFu) >= threshold) continue;
 
                     Write[nIndex] = new Cell
                     {
@@ -177,6 +181,27 @@ namespace Cinder.Simulation.Jobs
                 if (TryMove(x, y, x - first, y + 1, updated, p)) return;
             }
             Write[index] = updated;
+            Moved[ChunkIndexOf(x, y)]++;
+        }
+
+        /// <summary>火焰消失：有概率留下 BurnsInto 产物（数据驱动，火焰配为烟）。</summary>
+        void Extinguish(int x, int y, int index, in MaterialProps p, uint h)
+        {
+            if (p.BurnsInto != 0 && ((h >> 12) & 0xFFu) < SmokeOnDeathChance)
+            {
+                MaterialProps np = Mats[p.BurnsInto];
+                Write[index] = new Cell
+                {
+                    MaterialId = p.BurnsInto,
+                    State = np.BaseLife,
+                    Variant = (byte)(h & 3u),
+                    Flags = Cell.FlagMoved,
+                };
+            }
+            else
+            {
+                Write[index] = default;
+            }
             Moved[ChunkIndexOf(x, y)]++;
         }
 

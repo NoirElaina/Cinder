@@ -58,9 +58,12 @@ namespace Cinder.Simulation.Jobs
                     }
                     TempWrite[i] = t;
 
-                    // 相变（单格决策，全部查表）
+                    // 相变（单格决策，全部查表）。熔/沸/凝固是确定性的；
+                    // 唯独点燃按易燃度概率发生——整片可燃物到温后陆续起火，
+                    // 而不是同一帧全部闪燃。
                     ushort into = 0;
-                    if (p.BurnsInto != 0 && p.IgnitePointK > 0 && t >= (short)p.IgnitePointK) into = p.BurnsInto;
+                    if (p.BurnsInto != 0 && p.IgnitePointK > 0 && t >= (short)p.IgnitePointK
+                        && ((SimHash.Hash(x, y, Tick, Seed) >> 6) & 0xFFu) < p.Flammability) into = p.BurnsInto;
                     else if (p.BoilsInto != 0 && p.BoilPointK > 0 && t >= (short)p.BoilPointK) into = p.BoilsInto;
                     else if (p.MeltsInto != 0 && p.MeltPointK > 0 && t >= (short)p.MeltPointK) into = p.MeltsInto;
                     else if (p.FreezesInto != 0 && p.FreezePointK > 0 && t <= (short)p.FreezePointK) into = p.FreezesInto;

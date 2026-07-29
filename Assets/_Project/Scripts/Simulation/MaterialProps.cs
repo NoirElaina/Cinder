@@ -164,14 +164,17 @@ namespace Cinder.Simulation
             });
             table.Set(BuiltinMaterials.Wood, new MaterialProps
             {
-                Type = MatterType.StaticSolid, Density = 150, Flammability = 180, Conductivity = 40,
+                Type = MatterType.StaticSolid, Density = 150, Flammability = 18, Conductivity = 40,
                 IgnitePointK = 573, BurnsInto = BuiltinMaterials.Fire,
             });
             table.Set(BuiltinMaterials.Fire, new MaterialProps
-                { Type = MatterType.Fire, Density = 5, Fluidity = 160, BaseLife = 40, Conductivity = 60, SelfTempK = 1073 });
+            {
+                Type = MatterType.Fire, Density = 5, Fluidity = 160, BaseLife = 40, Conductivity = 60,
+                SelfTempK = 1073, BurnsInto = BuiltinMaterials.Smoke,
+            });
             table.Set(BuiltinMaterials.Oil, new MaterialProps
             {
-                Type = MatterType.Liquid, Density = 90, Fluidity = 200, Flammability = 210, Conductivity = 50,
+                Type = MatterType.Liquid, Density = 90, Fluidity = 200, Flammability = 60, Conductivity = 50,
                 IgnitePointK = 520, BurnsInto = BuiltinMaterials.Fire,
             });
             table.Set(BuiltinMaterials.Acid, new MaterialProps

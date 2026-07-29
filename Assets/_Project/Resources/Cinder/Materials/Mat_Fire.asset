@@ -34,7 +34,7 @@ MonoBehaviour:
   MeltPointK: 0
   BoilPointK: 0
   FreezePointK: 0
-  BurnsInto: {fileID: 0}
+  BurnsInto: {fileID: 11400000, guid: c7b60e6909d04d4cba02f672251c65b4, type: 2}
   MeltsInto: {fileID: 0}
   BoilsInto: {fileID: 0}
   FreezesInto: {fileID: 0}
