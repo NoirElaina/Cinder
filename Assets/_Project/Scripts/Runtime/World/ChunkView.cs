@@ -18,6 +18,12 @@ namespace Cinder.Runtime.World
         Sprite sprite;
         Color32[] pixels;
 
+        /// <summary>
+        /// 首次绑定到某区块后置真，重绘后清除。
+        /// 配合每帧重绘预算，超预算时留待下一帧。
+        /// </summary>
+        public bool PendingRedraw { get; set; }
+
         public void Initialize()
         {
             texture = new Texture2D(Size, Size, TextureFormat.RGBA32, false)
@@ -62,6 +68,7 @@ namespace Cinder.Runtime.World
         {
             texture.SetPixels32(pixels);
             texture.Apply(false, false);
+            PendingRedraw = false;
         }
 
         void OnDestroy()

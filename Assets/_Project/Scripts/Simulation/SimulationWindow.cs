@@ -86,6 +86,7 @@ namespace Cinder.Simulation
         /// <summary>外部编辑（挖掘/放置）。写当前缓冲并唤醒所在区块。</summary>
         public void SetCell(int worldX, int worldY, in Cell cell)
         {
+            if (!ContainsCell(worldX, worldY)) return;
             int index = IndexOf(worldX, worldY);
             read[index] = cell;
             int chunkIndex = ChunkIndexOf(index);

@@ -93,6 +93,7 @@ namespace Cinder.Runtime.World
             if (cam == null) return;
             Vector3 p = cam.transform.position;
             streamer.SetFocus(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
+            streamer.ProcessPendingLoads(3);
             UpdateViews();
         }
 
@@ -127,6 +128,9 @@ namespace Cinder.Runtime.World
 
         void UpdateViews()
         {
+            const int MaxRedrawsPerFrame = 4;
+            int redraws = 0;
+
             Vector3 center = cam.transform.position;
             float halfH = cam.orthographicSize + SimCoords.ChunkSize;
             float halfW = halfH * cam.aspect + SimCoords.ChunkSize;
@@ -148,21 +152,20 @@ namespace Cinder.Runtime.World
                     ChunkData stored = null;
                     if (!inWindow && !streamer.Grid.TryGet(cx, cy, out stored)) continue;
 
-                    bool created = false;
                     if (!views.TryGetValue(key, out ChunkView view))
                     {
                         view = pool.Get();
                         view.transform.position = new Vector3(
                             SimCoords.ChunkToCellOrigin(cx), SimCoords.ChunkToCellOrigin(cy), 0f);
+                        view.PendingRedraw = true;
                         views.Add(key, view);
-                        created = true;
                     }
 
                     int windowIndex = streamer.Window.WindowChunkIndex(cx, cy);
                     bool dirty = inWindow
-                        ? created || streamer.Window.ChunkDirty[windowIndex] == 1
-                        : created;
-                    if (!dirty) continue;
+                        ? view.PendingRedraw || streamer.Window.ChunkDirty[windowIndex] == 1
+                        : view.PendingRedraw;
+                    if (!dirty || redraws >= MaxRedrawsPerFrame) continue;
 
                     if (inWindow)
                     {
@@ -177,6 +180,7 @@ namespace Cinder.Runtime.World
                     {
                         view.RedrawFromChunk(stored, db);
                     }
+                    redraws++;
                 }
             }
 

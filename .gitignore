@@ -12,11 +12,16 @@
 # IDE
 .idea/
 .vscode/
+.vs/
 *.csproj
 *.sln
 *.slnx
 *.user
 *.userprefs
+
+# Unity 崩溃与内存快照
+*.dmp
+*.pdb
 
 # OS
 .DS_Store

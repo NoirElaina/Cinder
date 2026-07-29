@@ -24,6 +24,10 @@ namespace Cinder.Runtime.World
         readonly ChunkStore store;
         bool initialized;
 
+        /// <summary>待加载的驻留区块（分帧摊销，避免移位卡顿）。</summary>
+        readonly Queue<long> pendingResidents = new Queue<long>();
+        readonly HashSet<long> pendingSet = new HashSet<long>();
+
         public WorldGrid Grid { get; }
         public SimulationWindow Window { get; }
 
@@ -85,12 +89,16 @@ namespace Cinder.Runtime.World
             int minCy = Window.OriginChunkY - ResidentRadiusY;
             int maxCy = Window.OriginChunkY + WindowChunksY - 1 + ResidentRadiusY;
 
+            // 缺失的驻留区块进入分帧加载队列，而不是当帧同步生成
             for (int cy = minCy; cy <= maxCy; cy++)
             {
                 for (int cx = minCx; cx <= maxCx; cx++)
                 {
                     if (Window.ContainsChunk(cx, cy)) continue;
-                    Grid.GetOrCreate(cx, cy, LoadBytes);
+                    if (!Grid.ContainsY(cy)) continue;
+                    if (Grid.TryGet(cx, cy, out _)) continue;
+                    long key = SimCoords.PackKey(cx, cy);
+                    if (pendingSet.Add(key)) pendingResidents.Enqueue(key);
                 }
             }
 
@@ -106,6 +114,29 @@ namespace Cinder.Runtime.World
                 Grid.Remove(chunk.ChunkX, chunk.ChunkY);
                 if (chunk.Modified) store.SaveAsync(chunk);
                 chunk.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// 每帧调用，按预算加载驻留区块。过期的条目（焦点已移远）直接丢弃。
+        /// </summary>
+        public void ProcessPendingLoads(int budget)
+        {
+            int minCx = Window.OriginChunkX - ResidentRadiusX;
+            int maxCx = Window.OriginChunkX + WindowChunksX - 1 + ResidentRadiusX;
+            int minCy = Window.OriginChunkY - ResidentRadiusY;
+            int maxCy = Window.OriginChunkY + WindowChunksY - 1 + ResidentRadiusY;
+
+            while (budget > 0 && pendingResidents.Count > 0)
+            {
+                long key = pendingResidents.Dequeue();
+                pendingSet.Remove(key);
+                int cx = SimCoords.UnpackX(key);
+                int cy = SimCoords.UnpackY(key);
+                if (cx < minCx || cx > maxCx || cy < minCy || cy > maxCy) continue;
+                if (Window.ContainsChunk(cx, cy)) continue;
+                Grid.GetOrCreate(cx, cy, LoadBytes);
+                budget--;
             }
         }
 

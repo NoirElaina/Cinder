@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Cinder.Simulation.Jobs;
+using Unity.Jobs;
 
 namespace Cinder.Simulation
 {
@@ -53,7 +55,14 @@ namespace Cinder.Simulation
             else
             {
                 chunk = new ChunkData(chunkX, chunkY);
-                WorldGenerator.Generate(chunkX, chunkY, Seed, MinChunkY, chunk.Cells);
+                new GenerateChunkJob
+                {
+                    ChunkX = chunkX,
+                    ChunkY = chunkY,
+                    Seed = Seed,
+                    MinChunkY = MinChunkY,
+                    Dst = chunk.Cells,
+                }.Run();
             }
 
             chunks.Add(chunk.Key, chunk);

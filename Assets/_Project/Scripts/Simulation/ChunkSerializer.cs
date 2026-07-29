@@ -1,4 +1,5 @@
 using System;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 
 namespace Cinder.Simulation
@@ -11,8 +12,11 @@ namespace Cinder.Simulation
     {
         public const uint Magic = 0x314B4E43; // 'CNK1'
         public const int HeaderSize = 16;
-        public const int PayloadSize = ChunkData.CellCount * 4;
-        public const int TotalSize = HeaderSize + PayloadSize;
+
+        /// <summary>单格字节数取自真实布局，避免对齐填充假设。</summary>
+        public static readonly int CellStride = UnsafeUtility.SizeOf<Cell>();
+        public static readonly int PayloadSize = ChunkData.CellCount * CellStride;
+        public static readonly int TotalSize = HeaderSize + PayloadSize;
 
         public static unsafe byte[] Serialize(ChunkData chunk)
         {

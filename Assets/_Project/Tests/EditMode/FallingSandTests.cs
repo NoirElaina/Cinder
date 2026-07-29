@@ -77,7 +77,7 @@ namespace Cinder.Tests
         [Test]
         public void Sand_PouredColumn_SpreadsIntoPile()
         {
-            using var rig = new SimRig(2, 2);
+            using var rig = new SimRig(2, 3);
             for (int t = 0; t < 60; t++)
             {
                 rig.Window.SetCell(128, 380, Cell.Of(BuiltinMaterials.Sand));
@@ -94,7 +94,7 @@ namespace Cinder.Tests
         [Test]
         public void Water_SpreadsHorizontally()
         {
-            using var rig = new SimRig(2, 2);
+            using var rig = new SimRig(2, 3);
             rig.FillRect(120, 300, 136, 316, BuiltinMaterials.Water); // 17x17 = 289
             rig.Ticks(400);
 
