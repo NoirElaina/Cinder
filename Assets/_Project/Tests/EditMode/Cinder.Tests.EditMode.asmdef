@@ -4,6 +4,8 @@
     "references": [
         "Cinder.Simulation",
         "Cinder.Runtime",
+        "Cinder.Core",
+        "Cinder.Game",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

@@ -1,0 +1,16 @@
+{
+    "name": "Cinder.Game",
+    "rootNamespace": "Cinder.Game",
+    "references": [
+        "Cinder.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
