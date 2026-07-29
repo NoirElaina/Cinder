@@ -37,6 +37,14 @@ namespace Cinder.Runtime.Player
 
         public static PlayerController Spawn(WorldStreamer streamer, Camera cam, Vector2 feetPosition)
         {
+            var definition = GameContent.LoadPlayerCharacter();
+            WandInstance wand = GameContent.LoadStarterWand();
+            if (definition == null || wand == null)
+            {
+                Debug.LogError("[Cinder] 玩家内容资产缺失，跳过玩家生成（详见上方错误）。");
+                return null;
+            }
+
             var go = new GameObject("Player");
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = CreatePlayerSprite();
@@ -48,17 +56,16 @@ namespace Cinder.Runtime.Player
             player.cam = cam;
             player.spriteRenderer = sr;
 
-            player.Character = new Character(GameContent.LoadPlayerCharacter());
+            player.Character = new Character(definition);
             player.body = new PixelBody(new WindowCellSampler(streamer), feetPosition);
-            player.Wand = GameContent.LoadStarterWand();
+            player.Wand = wand;
 
             // 演示物品：入包 + 装备系统（属性修饰按 wand. 前缀路由）
             player.Inventory = new Inventory(12);
             ItemDefinition[] starterItems = GameContent.LoadStarterItems();
-            player.demoRing = starterItems[0];
-            player.demoCore = starterItems[1];
-            player.Inventory.Add(player.demoRing);
-            player.Inventory.Add(player.demoCore);
+            player.demoRing = starterItems.Length > 0 ? starterItems[0] : null;
+            player.demoCore = starterItems.Length > 1 ? starterItems[1] : null;
+            foreach (ItemDefinition item in starterItems) player.Inventory.Add(item);
             player.Equipment = new Equipment(attribute =>
                 attribute != null && attribute.StartsWith("wand.")
                     ? player.Wand.Attributes

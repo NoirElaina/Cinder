@@ -10,22 +10,24 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5ce6fb51501550b458391c927a9e2554, type: 3}
-  m_Name: Mat_Steam
+  m_Name: Mat_Lava
   m_EditorClassIdentifier: Cinder.Runtime::Cinder.Runtime.Materials.MaterialDefinition
-  Id: 10
-  DisplayName: "\u84B8\u6C7D"
-  Type: 4
-  Density: 10
-  Fluidity: 180
+  Id: 12
+  DisplayName: "\u5CA9\u6D46"
+  Type: 3
+  Density: 200
+  Fluidity: 60
   Flammability: 0
   BaseLife: 0
   Palette:
   - serializedVersion: 2
-    rgba: 4291676360
+    rgba: 4279524095
   - serializedVersion: 2
-    rgba: 4292663255
-  Conductivity: 30
-  SelfTempK: 0
+    rgba: 4278861030
+  - serializedVersion: 2
+    rgba: 4280847615
+  Conductivity: 100
+  SelfTempK: 1400
   IgnitePointK: 0
   MeltPointK: 0
   BoilPointK: 0

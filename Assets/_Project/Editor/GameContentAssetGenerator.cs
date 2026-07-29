@@ -36,30 +36,63 @@ namespace Cinder.EditorTools
             EnsureFolder(Root, "Characters");
 
             // ---- 物质 ----
+            var bedrock = Mat("Mat_Bedrock", BuiltinMaterials.Bedrock, "基岩", MatterType.StaticSolid, 255,
+                colors: C(40, 40, 48, 34, 34, 42));
+            var rock = Mat("Mat_Rock", BuiltinMaterials.Rock, "岩石", MatterType.StaticSolid, 200,
+                colors: C(110, 105, 100, 95, 90, 88, 122, 116, 106));
+            var dirt = Mat("Mat_Dirt", BuiltinMaterials.Dirt, "泥土", MatterType.StaticSolid, 180,
+                colors: C(120, 85, 55, 105, 72, 45, 132, 96, 62));
+            var sand = Mat("Mat_Sand", BuiltinMaterials.Sand, "沙", MatterType.Powder, 160,
+                colors: C(210, 185, 130, 200, 175, 120, 222, 197, 142));
+            var water = Mat("Mat_Water", BuiltinMaterials.Water, "水", MatterType.Liquid, 100, fluidity: 220,
+                colors: C(45, 110, 220, 40, 100, 210, 60, 125, 235));
+            var wood = Mat("Mat_Wood", BuiltinMaterials.Wood, "木头", MatterType.StaticSolid, 150, flammability: 180,
+                colors: C(110, 70, 40, 95, 60, 32, 124, 80, 46));
+            var fire = Mat("Mat_Fire", BuiltinMaterials.Fire, "火焰", MatterType.Fire, 5, fluidity: 160, baseLife: 40,
+                colors: C(250, 180, 40, 245, 120, 20, 255, 220, 90, 235, 80, 10));
+            var oil = Mat("Mat_Oil", BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 210,
+                colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26));
+            var acid = Mat("Mat_Acid", BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
+                colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95));
+            var steam = Mat("Mat_Steam", BuiltinMaterials.Steam, "蒸汽", MatterType.Gas, 10, fluidity: 180,
+                colors: C(200, 200, 205, 215, 215, 220));
+            var smoke = Mat("Mat_Smoke", BuiltinMaterials.Smoke, "烟", MatterType.Gas, 15, fluidity: 120, baseLife: 150,
+                colors: C(90, 90, 95, 105, 105, 110, 75, 75, 80));
+            var lava = Mat("Mat_Lava", BuiltinMaterials.Lava, "岩浆", MatterType.Liquid, 200, fluidity: 60,
+                colors: C(255, 90, 20, 230, 60, 10, 255, 140, 40));
+            var ice = Mat("Mat_Ice", BuiltinMaterials.Ice, "冰", MatterType.StaticSolid, 92,
+                colors: C(170, 220, 245, 190, 230, 250, 150, 205, 240));
+
+            // ---- 热学接线（温度通道数据）----
+            bedrock.Conductivity = 90;
+            rock.Conductivity = 90;
+            dirt.Conductivity = 60;
+            sand.Conductivity = 70;
+            acid.Conductivity = 100;
+            steam.Conductivity = 30;
+            smoke.Conductivity = 20;
+            fire.Conductivity = 60;
+            fire.SelfTempK = 1073;
+            lava.Conductivity = 100;
+            lava.SelfTempK = 1400;
+            wood.Conductivity = 40;
+            wood.IgnitePointK = 573;
+            wood.BurnsInto = fire;
+            oil.Conductivity = 50;
+            oil.IgnitePointK = 520;
+            oil.BurnsInto = fire;
+            water.Conductivity = 120;
+            water.BoilPointK = 373;
+            water.BoilsInto = steam;
+            water.FreezePointK = 273;
+            water.FreezesInto = ice;
+            ice.Conductivity = 110;
+            ice.MeltPointK = 300;
+            ice.MeltsInto = water;
+
             var materials = new List<MaterialDefinition>
             {
-                Mat("Mat_Bedrock", BuiltinMaterials.Bedrock, "基岩", MatterType.StaticSolid, 255,
-                    colors: C(40, 40, 48, 34, 34, 42)),
-                Mat("Mat_Rock", BuiltinMaterials.Rock, "岩石", MatterType.StaticSolid, 200,
-                    colors: C(110, 105, 100, 95, 90, 88, 122, 116, 106)),
-                Mat("Mat_Dirt", BuiltinMaterials.Dirt, "泥土", MatterType.StaticSolid, 180,
-                    colors: C(120, 85, 55, 105, 72, 45, 132, 96, 62)),
-                Mat("Mat_Sand", BuiltinMaterials.Sand, "沙", MatterType.Powder, 160,
-                    colors: C(210, 185, 130, 200, 175, 120, 222, 197, 142)),
-                Mat("Mat_Water", BuiltinMaterials.Water, "水", MatterType.Liquid, 100, fluidity: 220,
-                    colors: C(45, 110, 220, 40, 100, 210, 60, 125, 235)),
-                Mat("Mat_Wood", BuiltinMaterials.Wood, "木头", MatterType.StaticSolid, 150, flammability: 180,
-                    colors: C(110, 70, 40, 95, 60, 32, 124, 80, 46)),
-                Mat("Mat_Fire", BuiltinMaterials.Fire, "火焰", MatterType.Fire, 5, fluidity: 160, baseLife: 40,
-                    colors: C(250, 180, 40, 245, 120, 20, 255, 220, 90, 235, 80, 10)),
-                Mat("Mat_Oil", BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 210,
-                    colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26)),
-                Mat("Mat_Acid", BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
-                    colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95)),
-                Mat("Mat_Steam", BuiltinMaterials.Steam, "蒸汽", MatterType.Gas, 10, fluidity: 180,
-                    colors: C(200, 200, 205, 215, 215, 220)),
-                Mat("Mat_Smoke", BuiltinMaterials.Smoke, "烟", MatterType.Gas, 15, fluidity: 120, baseLife: 150,
-                    colors: C(90, 90, 95, 105, 105, 110, 75, 75, 80)),
+                bedrock, rock, dirt, sand, water, wood, fire, oil, acid, steam, smoke, lava, ice,
             };
 
             // 物质落盘后再建数据库引用，否则跨资源引用可能落空
@@ -72,6 +105,16 @@ namespace Cinder.EditorTools
             list.arraySize = materials.Count;
             for (int i = 0; i < materials.Count; i++)
                 list.GetArrayElementAtIndex(i).objectReferenceValue = materials[i];
+
+            // 反应表：岩浆淬水/淬冰成岩，酸腐蚀常规固体
+            SerializedProperty reactionList = so.FindProperty("reactions");
+            reactionList.arraySize = 6;
+            SetReaction(reactionList.GetArrayElementAtIndex(0), lava, water, 0.9f, outA: rock, outB: steam);
+            SetReaction(reactionList.GetArrayElementAtIndex(1), lava, ice, 0.9f, outA: rock, outB: water);
+            SetReaction(reactionList.GetArrayElementAtIndex(2), acid, rock, 0.25f, consumeB: true);
+            SetReaction(reactionList.GetArrayElementAtIndex(3), acid, dirt, 0.3f, consumeB: true);
+            SetReaction(reactionList.GetArrayElementAtIndex(4), acid, sand, 0.3f, consumeB: true);
+            SetReaction(reactionList.GetArrayElementAtIndex(5), acid, wood, 0.3f, consumeB: true);
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // ---- 效果 ----
@@ -217,6 +260,19 @@ namespace Cinder.EditorTools
             def.Flammability = flammability;
             def.BaseLife = baseLife;
             def.Palette = colors ?? C(255, 0, 255);
+
+            // 复用旧资产时把热学字段全部归零，保证脚本是唯一数据真源，
+            // 后面的热学接线段再按需赋值
+            def.Conductivity = 0;
+            def.SelfTempK = 0;
+            def.IgnitePointK = 0;
+            def.MeltPointK = 0;
+            def.BoilPointK = 0;
+            def.FreezePointK = 0;
+            def.BurnsInto = null;
+            def.MeltsInto = null;
+            def.BoilsInto = null;
+            def.FreezesInto = null;
             return def;
         }
 
@@ -236,9 +292,19 @@ namespace Cinder.EditorTools
 
         static T Create<T>(string path) where T : ScriptableObject
         {
-            // 覆盖式生成：旧资产（含绑定损坏的）先删后建
-            AssetDatabase.DeleteAsset(path);
-            T asset = ScriptableObject.CreateInstance<T>();
+            // 存在则原地复用：保住 GUID，所有指向它的引用永不落空；
+            // 只有类型对不上（绑定损坏）时才删了重建
+            T asset = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (asset != null)
+            {
+                dirtyAssets.Add(asset);
+                return asset;
+            }
+
+            if (AssetDatabase.LoadMainAssetAtPath(path) != null)
+                AssetDatabase.DeleteAsset(path);
+
+            asset = ScriptableObject.CreateInstance<T>();
             AssetDatabase.CreateAsset(asset, path);
             dirtyAssets.Add(asset);
             return asset;
@@ -248,6 +314,19 @@ namespace Cinder.EditorTools
         {
             if (!AssetDatabase.IsValidFolder($"{parent}/{name}"))
                 AssetDatabase.CreateFolder(parent, name);
+        }
+
+        static void SetReaction(SerializedProperty entry, MaterialDefinition a, MaterialDefinition b,
+            float chance, MaterialDefinition outA = null, MaterialDefinition outB = null,
+            bool consumeA = false, bool consumeB = false)
+        {
+            entry.FindPropertyRelative("A").objectReferenceValue = a;
+            entry.FindPropertyRelative("B").objectReferenceValue = b;
+            entry.FindPropertyRelative("Chance").floatValue = chance;
+            entry.FindPropertyRelative("OutA").objectReferenceValue = outA;
+            entry.FindPropertyRelative("OutB").objectReferenceValue = outB;
+            entry.FindPropertyRelative("ConsumeA").boolValue = consumeA;
+            entry.FindPropertyRelative("ConsumeB").boolValue = consumeB;
         }
     }
 }

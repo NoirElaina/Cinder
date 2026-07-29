@@ -12,9 +12,30 @@ namespace Cinder.Runtime.Materials
     [CreateAssetMenu(menuName = "Cinder/Material Database", fileName = "MaterialDatabase")]
     public sealed class MaterialDatabase : ScriptableObject
     {
+        /// <summary>双格反应条目（可在 Inspector 里编辑）。新增反应 = 加一行，零代码。</summary>
+        [Serializable]
+        public class ReactionEntry
+        {
+            public MaterialDefinition A;
+            public MaterialDefinition B;
+            [Range(0f, 1f)] public float Chance = 1f;
+
+            [Tooltip("反应后 A 变成（空 = 保持不变）")]
+            public MaterialDefinition OutA;
+            [Tooltip("反应后 B 变成（空 = 保持不变）")]
+            public MaterialDefinition OutB;
+
+            [Tooltip("勾选则反应消耗 A")]
+            public bool ConsumeA;
+            [Tooltip("勾选则反应消耗 B")]
+            public bool ConsumeB;
+        }
+
         [SerializeField] List<MaterialDefinition> materials = new List<MaterialDefinition>();
+        [SerializeField] List<ReactionEntry> reactions = new List<ReactionEntry>();
 
         public IReadOnlyList<MaterialDefinition> Materials => materials;
+        public IReadOnlyList<ReactionEntry> Reactions => reactions;
 
         /// <summary>当前生效的原生物质表（最近一次 Rebuild 的结果）。</summary>
         public MaterialTable Table { get; private set; }
@@ -39,6 +60,16 @@ namespace Cinder.Runtime.Materials
                 Table.Set(id, def.ToProps());
                 palettes[id] = def.Palette;
                 names[id] = def.DisplayName;
+            }
+
+            foreach (ReactionEntry e in reactions)
+            {
+                if (e == null || e.A == null || e.B == null) continue;
+                ushort a = e.A.MaterialId;
+                ushort b = e.B.MaterialId;
+                ushort outA = e.ConsumeA ? BuiltinMaterials.Empty : (e.OutA != null ? e.OutA.MaterialId : a);
+                ushort outB = e.ConsumeB ? BuiltinMaterials.Empty : (e.OutB != null ? e.OutB.MaterialId : b);
+                Table.SetReaction(a, b, (byte)Mathf.RoundToInt(Mathf.Clamp01(e.Chance) * 255f), outA, outB);
             }
             Rebuilt?.Invoke();
         }
@@ -85,63 +116,6 @@ namespace Cinder.Runtime.Materials
         {
             Table?.Dispose();
             Table = null;
-        }
-
-        /// <summary>纯代码构建内置物质库，查看器零资产可跑。</summary>
-        public static MaterialDatabase CreateDefault()
-        {
-            var db = CreateInstance<MaterialDatabase>();
-            db.materials = new List<MaterialDefinition>
-            {
-                Make(BuiltinMaterials.Bedrock, "基岩", MatterType.StaticSolid, 255,
-                    colors: C(40, 40, 48, 34, 34, 42)),
-                Make(BuiltinMaterials.Rock, "岩石", MatterType.StaticSolid, 200,
-                    colors: C(110, 105, 100, 95, 90, 88, 122, 116, 106)),
-                Make(BuiltinMaterials.Dirt, "泥土", MatterType.StaticSolid, 180,
-                    colors: C(120, 85, 55, 105, 72, 45, 132, 96, 62)),
-                Make(BuiltinMaterials.Sand, "沙", MatterType.Powder, 160,
-                    colors: C(210, 185, 130, 200, 175, 120, 222, 197, 142)),
-                Make(BuiltinMaterials.Water, "水", MatterType.Liquid, 100, fluidity: 220,
-                    colors: C(45, 110, 220, 40, 100, 210, 60, 125, 235)),
-                Make(BuiltinMaterials.Wood, "木头", MatterType.StaticSolid, 150, flammability: 180,
-                    colors: C(110, 70, 40, 95, 60, 32, 124, 80, 46)),
-                Make(BuiltinMaterials.Fire, "火焰", MatterType.Fire, 5, fluidity: 160, baseLife: 40,
-                    colors: C(250, 180, 40, 245, 120, 20, 255, 220, 90, 235, 80, 10)),
-                Make(BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 210,
-                    colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26)),
-                Make(BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
-                    colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95)),
-                Make(BuiltinMaterials.Steam, "蒸汽", MatterType.Gas, 10, fluidity: 180,
-                    colors: C(200, 200, 205, 215, 215, 220)),
-                Make(BuiltinMaterials.Smoke, "烟", MatterType.Gas, 15, fluidity: 120, baseLife: 150,
-                    colors: C(90, 90, 95, 105, 105, 110, 75, 75, 80)),
-            };
-            db.Rebuild();
-            return db;
-        }
-
-        static Color32[] C(params int[] rgb)
-        {
-            var colors = new Color32[rgb.Length / 3];
-            for (int i = 0; i < colors.Length; i++)
-                colors[i] = new Color32((byte)rgb[i * 3], (byte)rgb[i * 3 + 1], (byte)rgb[i * 3 + 2], 255);
-            return colors;
-        }
-
-        static MaterialDefinition Make(ushort id, string displayName, MatterType type,
-            int density, int fluidity = 0, int flammability = 0, int baseLife = 0,
-            Color32[] colors = null)
-        {
-            var def = CreateInstance<MaterialDefinition>();
-            def.Id = id;
-            def.DisplayName = displayName;
-            def.Type = type;
-            def.Density = density;
-            def.Fluidity = fluidity;
-            def.Flammability = flammability;
-            def.BaseLife = baseLife;
-            def.Palette = colors ?? new Color32[] { new Color32(255, 0, 255, 255) };
-            return def;
         }
 
         void OnDestroy()

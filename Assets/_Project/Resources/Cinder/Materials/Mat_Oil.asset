@@ -26,3 +26,13 @@ MonoBehaviour:
     rgba: 4280298039
   - serializedVersion: 2
     rgba: 4279901734
+  Conductivity: 50
+  SelfTempK: 0
+  IgnitePointK: 520
+  MeltPointK: 0
+  BoilPointK: 0
+  FreezePointK: 0
+  BurnsInto: {fileID: 11400000, guid: d1bcf84393744512bbbaab02f212fe07, type: 2}
+  MeltsInto: {fileID: 0}
+  BoilsInto: {fileID: 0}
+  FreezesInto: {fileID: 0}

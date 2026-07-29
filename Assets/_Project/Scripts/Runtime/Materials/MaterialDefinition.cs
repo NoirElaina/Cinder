@@ -23,6 +23,25 @@ namespace Cinder.Runtime.Materials
         [Tooltip("渲染调色板，按 Cell.Variant 取色")]
         public Color32[] Palette = { new Color32(255, 0, 255, 255) };
 
+        [Header("热学（温度通道）")]
+        [Range(0, 255)] public int Conductivity;
+
+        [Tooltip("自发热温度 K，0 = 无热源（火焰/岩浆）")]
+        [Range(0, 3000)] public int SelfTempK;
+
+        [Tooltip("点燃温度 K，达到且 BurnsInto 非空时转变")]
+        [Range(0, 3000)] public int IgnitePointK;
+
+        [Range(0, 3000)] public int MeltPointK;
+        [Range(0, 3000)] public int BoilPointK;
+        [Range(0, 3000)] public int FreezePointK;
+
+        [Tooltip("燃烧后变成的物质（空 = 不发生）")]
+        public MaterialDefinition BurnsInto;
+        public MaterialDefinition MeltsInto;
+        public MaterialDefinition BoilsInto;
+        public MaterialDefinition FreezesInto;
+
         public ushort MaterialId => (ushort)Mathf.Clamp(Id, 0, MaterialTable.Capacity - 1);
 
         public MaterialProps ToProps() => new MaterialProps
@@ -32,6 +51,18 @@ namespace Cinder.Runtime.Materials
             Fluidity = (byte)Mathf.Clamp(Fluidity, 0, 255),
             Flammability = (byte)Mathf.Clamp(Flammability, 0, 255),
             BaseLife = (byte)Mathf.Clamp(BaseLife, 0, 255),
+            Conductivity = (byte)Mathf.Clamp(Conductivity, 0, 255),
+            SelfTempK = (ushort)Mathf.Clamp(SelfTempK, 0, 3000),
+            IgnitePointK = (ushort)Mathf.Clamp(IgnitePointK, 0, 3000),
+            MeltPointK = (ushort)Mathf.Clamp(MeltPointK, 0, 3000),
+            BoilPointK = (ushort)Mathf.Clamp(BoilPointK, 0, 3000),
+            FreezePointK = (ushort)Mathf.Clamp(FreezePointK, 0, 3000),
+            BurnsInto = IdOf(BurnsInto),
+            MeltsInto = IdOf(MeltsInto),
+            BoilsInto = IdOf(BoilsInto),
+            FreezesInto = IdOf(FreezesInto),
         };
+
+        static ushort IdOf(MaterialDefinition def) => def != null ? def.MaterialId : (ushort)0;
     }
 }

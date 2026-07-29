@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Cinder.Game.Characters;
 using Cinder.Game.Items;
 using Cinder.Game.Spells;
@@ -7,53 +8,55 @@ using UnityEngine;
 namespace Cinder.Runtime
 {
     /// <summary>
-    /// 游戏内容目录：优先从 Resources/Cinder 加载数据资产（热插拔数据源，
-    /// 在 Project 窗口直接编辑/增删即可），资产缺失时回退到纯代码默认构建，
-    /// 保证零资产也能跑。
+    /// 游戏内容目录：从 Resources/Cinder 加载数据资产，这是唯一数据源。
+    /// 资产缺失即报错（数据驱动，不设代码回退）；
+    /// 缺资产时运行一次菜单 Cinder → Generate Game Content Assets 即可生成全套。
     /// </summary>
     public static class GameContent
     {
-        /// <summary>ownsInstance = true 表示返回的是代码创建的临时实例，使用方负责 Destroy。</summary>
-        public static MaterialDatabase LoadMaterials(out bool ownsInstance)
+        public const string MaterialsPath = "Cinder/MaterialDatabase";
+        public const string PlayerCharacterPath = "Cinder/Characters/Character_Player";
+        public const string StarterWandPath = "Cinder/Wands/Wand_Starter";
+        public const string SwiftRingPath = "Cinder/Items/Item_SwiftRing";
+        public const string ManaCorePath = "Cinder/Items/Item_ManaCore";
+
+        public static MaterialDatabase LoadMaterials()
         {
-            var db = Resources.Load<MaterialDatabase>("Cinder/MaterialDatabase");
-            if (db != null)
-            {
-                db.Rebuild();
-                ownsInstance = false;
-                return db;
-            }
-            ownsInstance = true;
-            return MaterialDatabase.CreateDefault();
+            var db = Load<MaterialDatabase>(MaterialsPath, required: true);
+            if (db != null) db.Rebuild();
+            return db;
         }
 
-        public static CharacterDefinition LoadPlayerCharacter()
-        {
-            var def = Resources.Load<CharacterDefinition>("Cinder/Characters/Character_Player");
-            if (def != null) return def;
-
-            var fallback = ScriptableObject.CreateInstance<CharacterDefinition>();
-            fallback.ModuleId = "character.player";
-            fallback.DisplayName = "玩家";
-            fallback.MaxHealth = 100f;
-            fallback.MoveSpeed = 22f;
-            fallback.JumpStrength = 38f;
-            return fallback;
-        }
+        public static CharacterDefinition LoadPlayerCharacter() =>
+            Load<CharacterDefinition>(PlayerCharacterPath, required: true);
 
         public static WandInstance LoadStarterWand()
         {
-            var def = Resources.Load<WandDefinition>("Cinder/Wands/Wand_Starter");
-            return def != null ? WandFactory.Create(def) : WandFactory.CreateDefault();
+            var def = Load<WandDefinition>(StarterWandPath, required: true);
+            return def != null ? WandFactory.Create(def) : null;
         }
 
+        /// <summary>初始物品（可选内容，缺失仅告警不阻断）。</summary>
         public static ItemDefinition[] LoadStarterItems()
         {
-            var ring = Resources.Load<ItemDefinition>("Cinder/Items/Item_SwiftRing");
-            var core = Resources.Load<ItemDefinition>("Cinder/Items/Item_ManaCore");
-            if (ring == null) ring = ItemFactory.CreateDemoRing();
-            if (core == null) core = ItemFactory.CreateDemoCore();
-            return new[] { ring, core };
+            var items = new List<ItemDefinition>(2);
+            ItemDefinition ring = Load<ItemDefinition>(SwiftRingPath, required: false);
+            ItemDefinition core = Load<ItemDefinition>(ManaCorePath, required: false);
+            if (ring != null) items.Add(ring);
+            if (core != null) items.Add(core);
+            return items.ToArray();
+        }
+
+        static T Load<T>(string path, bool required) where T : Object
+        {
+            var asset = Resources.Load<T>(path);
+            if (asset != null) return asset;
+
+            string message = $"[Cinder] 内容资产缺失: Assets/_Project/Resources/{path}.asset" +
+                "（运行菜单 Cinder → Generate Game Content Assets 生成）";
+            if (required) Debug.LogError(message);
+            else Debug.LogWarning(message);
+            return null;
         }
     }
 }

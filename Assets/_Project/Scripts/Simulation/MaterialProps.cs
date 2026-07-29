@@ -30,6 +30,36 @@ namespace Cinder.Simulation
 
         /// <summary>放置/点燃时的初始 State（如火焰寿命），0 = 不用。</summary>
         public byte BaseLife;
+
+        /// <summary>0..255，导热系数：每 tick 与邻居均温的交换比例。</summary>
+        public byte Conductivity;
+
+        /// <summary>自发热温度（K），0 = 无热源。火焰/岩浆恒为该温度。</summary>
+        public ushort SelfTempK;
+
+        /// <summary>点燃温度（K），达到且 BurnsInto 非 0 时转变。</summary>
+        public ushort IgnitePointK;
+
+        /// <summary>熔点（K）。</summary>
+        public ushort MeltPointK;
+
+        /// <summary>沸点（K）。</summary>
+        public ushort BoilPointK;
+
+        /// <summary>凝固点（K），温度低于等于它时转变。</summary>
+        public ushort FreezePointK;
+
+        /// <summary>燃烧后变成的物质 Id，0 = 不发生。</summary>
+        public ushort BurnsInto;
+
+        /// <summary>熔化后变成的物质 Id，0 = 不发生。</summary>
+        public ushort MeltsInto;
+
+        /// <summary>沸腾后变成的物质 Id，0 = 不发生。</summary>
+        public ushort BoilsInto;
+
+        /// <summary>凝固后变成的物质 Id，0 = 不发生。</summary>
+        public ushort FreezesInto;
     }
 
     /// <summary>内置物质 Id。自定义热插拔物质请使用 >= CustomBase 的 Id。</summary>
@@ -47,6 +77,8 @@ namespace Cinder.Simulation
         public const ushort Acid = 9;
         public const ushort Steam = 10;
         public const ushort Smoke = 11;
+        public const ushort Lava = 12;
+        public const ushort Ice = 13;
 
         public const ushort CustomBase = 16;
     }
@@ -79,13 +111,18 @@ namespace Cinder.Simulation
         public const int Capacity = 256;
 
         NativeArray<MaterialProps> props;
+        NativeArray<ReactionRule> reactions;
 
         public MaterialTable()
         {
             props = new NativeArray<MaterialProps>(Capacity, Allocator.Persistent);
+            reactions = new NativeArray<ReactionRule>(Capacity * Capacity, Allocator.Persistent);
         }
 
         public NativeArray<MaterialProps> Native => props;
+
+        /// <summary>对称反应表，[a * Capacity + b] 与 [b * Capacity + a] 同时写入。</summary>
+        public NativeArray<ReactionRule> Reactions => reactions;
 
         public MaterialProps this[ushort id] => props[id];
 
@@ -93,9 +130,18 @@ namespace Cinder.Simulation
 
         public void Clear(ushort id) => props[id] = default;
 
+        /// <summary>注册一条双向反应：A 遇 B 以 chance/255 概率变为 outA/outB（与自身同 Id = 不变）。</summary>
+        public void SetReaction(ushort a, ushort b, byte chance, ushort outA, ushort outB)
+        {
+            var rule = new ReactionRule { Exists = 1, Chance = chance, OutA = outA, OutB = outB };
+            reactions[a * Capacity + b] = rule;
+            reactions[b * Capacity + a] = rule;
+        }
+
         public void Dispose()
         {
             if (props.IsCreated) props.Dispose();
+            if (reactions.IsCreated) reactions.Dispose();
         }
 
         /// <summary>内置物质的默认属性，测试与默认数据库共用同一份定义。</summary>
@@ -103,27 +149,58 @@ namespace Cinder.Simulation
         {
             var table = new MaterialTable();
             table.Set(BuiltinMaterials.Bedrock, new MaterialProps
-                { Type = MatterType.StaticSolid, Density = 255 });
+                { Type = MatterType.StaticSolid, Density = 255, Conductivity = 90 });
             table.Set(BuiltinMaterials.Rock, new MaterialProps
-                { Type = MatterType.StaticSolid, Density = 200 });
+                { Type = MatterType.StaticSolid, Density = 200, Conductivity = 90 });
             table.Set(BuiltinMaterials.Dirt, new MaterialProps
-                { Type = MatterType.StaticSolid, Density = 180 });
+                { Type = MatterType.StaticSolid, Density = 180, Conductivity = 60 });
             table.Set(BuiltinMaterials.Sand, new MaterialProps
-                { Type = MatterType.Powder, Density = 160 });
+                { Type = MatterType.Powder, Density = 160, Conductivity = 70 });
             table.Set(BuiltinMaterials.Water, new MaterialProps
-                { Type = MatterType.Liquid, Density = 100, Fluidity = 220 });
+            {
+                Type = MatterType.Liquid, Density = 100, Fluidity = 220, Conductivity = 120,
+                BoilPointK = 373, BoilsInto = BuiltinMaterials.Steam,
+                FreezePointK = 273, FreezesInto = BuiltinMaterials.Ice,
+            });
             table.Set(BuiltinMaterials.Wood, new MaterialProps
-                { Type = MatterType.StaticSolid, Density = 150, Flammability = 180 });
+            {
+                Type = MatterType.StaticSolid, Density = 150, Flammability = 180, Conductivity = 40,
+                IgnitePointK = 573, BurnsInto = BuiltinMaterials.Fire,
+            });
             table.Set(BuiltinMaterials.Fire, new MaterialProps
-                { Type = MatterType.Fire, Density = 5, Fluidity = 160, BaseLife = 40 });
+                { Type = MatterType.Fire, Density = 5, Fluidity = 160, BaseLife = 40, Conductivity = 60, SelfTempK = 1073 });
             table.Set(BuiltinMaterials.Oil, new MaterialProps
-                { Type = MatterType.Liquid, Density = 90, Fluidity = 200, Flammability = 210 });
+            {
+                Type = MatterType.Liquid, Density = 90, Fluidity = 200, Flammability = 210, Conductivity = 50,
+                IgnitePointK = 520, BurnsInto = BuiltinMaterials.Fire,
+            });
             table.Set(BuiltinMaterials.Acid, new MaterialProps
-                { Type = MatterType.Liquid, Density = 110, Fluidity = 210 });
+                { Type = MatterType.Liquid, Density = 110, Fluidity = 210, Conductivity = 100 });
             table.Set(BuiltinMaterials.Steam, new MaterialProps
-                { Type = MatterType.Gas, Density = 10, Fluidity = 180 });
+                { Type = MatterType.Gas, Density = 10, Fluidity = 180, Conductivity = 30 });
             table.Set(BuiltinMaterials.Smoke, new MaterialProps
-                { Type = MatterType.Gas, Density = 15, Fluidity = 120, BaseLife = 150 });
+                { Type = MatterType.Gas, Density = 15, Fluidity = 120, BaseLife = 150, Conductivity = 20 });
+            table.Set(BuiltinMaterials.Lava, new MaterialProps
+                { Type = MatterType.Liquid, Density = 200, Fluidity = 60, Conductivity = 100, SelfTempK = 1400 });
+            table.Set(BuiltinMaterials.Ice, new MaterialProps
+            {
+                Type = MatterType.StaticSolid, Density = 92, Conductivity = 110,
+                MeltPointK = 300, MeltsInto = BuiltinMaterials.Water,
+            });
+
+            // 内置反应（对称写入）：岩浆淬水成岩 + 蒸汽；酸腐蚀常规固体
+            table.SetReaction(BuiltinMaterials.Lava, BuiltinMaterials.Water, 230,
+                BuiltinMaterials.Rock, BuiltinMaterials.Steam);
+            table.SetReaction(BuiltinMaterials.Lava, BuiltinMaterials.Ice, 230,
+                BuiltinMaterials.Rock, BuiltinMaterials.Water);
+            table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Rock, 60,
+                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+            table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Dirt, 76,
+                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+            table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Sand, 76,
+                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+            table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Wood, 76,
+                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
             return table;
         }
     }

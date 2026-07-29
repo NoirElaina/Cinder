@@ -189,6 +189,9 @@ namespace Cinder.Runtime.World
                 if (chunk.Modified) store.SaveSync(chunk);
         }
 
+        /// <summary>清空磁盘存档（世界重置用，不回存当前内存状态）。</summary>
+        public void DeleteSaveData() => store.DeleteAll();
+
         public void Dispose()
         {
             Window.Dispose();

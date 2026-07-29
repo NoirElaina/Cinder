@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Tasks;
 using Cinder.Simulation;
@@ -13,6 +14,7 @@ namespace Cinder.Runtime.World
     public sealed class ChunkStore
     {
         readonly string directory;
+        readonly ConcurrentBag<Task> pendingWrites = new ConcurrentBag<Task>();
 
         public ChunkStore(int seed)
         {
@@ -41,7 +43,7 @@ namespace Cinder.Runtime.World
         {
             byte[] bytes = ChunkSerializer.Serialize(chunk);
             string path = PathFor(chunk.ChunkX, chunk.ChunkY);
-            Task.Run(() =>
+            Task task = Task.Run(() =>
             {
                 try { File.WriteAllBytes(path, bytes); }
                 catch (Exception e)
@@ -49,6 +51,7 @@ namespace Cinder.Runtime.World
                     Debug.LogWarning($"[Cinder] 区块保存失败 ({chunk.ChunkX},{chunk.ChunkY}): {e.Message}");
                 }
             });
+            pendingWrites.Add(task);
         }
 
         public void SaveSync(ChunkData chunk)
@@ -57,6 +60,21 @@ namespace Cinder.Runtime.World
             catch (Exception e)
             {
                 Debug.LogWarning($"[Cinder] 区块保存失败 ({chunk.ChunkX},{chunk.ChunkY}): {e.Message}");
+            }
+        }
+
+        /// <summary>清空存档（世界重置）。先等在途的异步写盘，避免删完又被写回。</summary>
+        public void DeleteAll()
+        {
+            try
+            {
+                Task.WaitAll(pendingWrites.ToArray(), millisecondsTimeout: 2000);
+                foreach (string file in Directory.GetFiles(directory, "*.cnk"))
+                    File.Delete(file);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Cinder] 存档清空失败: {e.Message}");
             }
         }
     }

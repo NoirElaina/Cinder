@@ -25,11 +25,10 @@ namespace Cinder.Runtime.World
             BuiltinMaterials.Sand, BuiltinMaterials.Water, BuiltinMaterials.Dirt,
             BuiltinMaterials.Rock, BuiltinMaterials.Wood, BuiltinMaterials.Fire,
             BuiltinMaterials.Bedrock, BuiltinMaterials.Oil, BuiltinMaterials.Acid,
-            BuiltinMaterials.Smoke,
+            BuiltinMaterials.Smoke, BuiltinMaterials.Lava, BuiltinMaterials.Ice,
         };
 
         MaterialDatabase db;
-        bool ownsDatabase;
         WorldStreamer streamer;
         SimulationEngine engine;
         ChunkViewPool pool;
@@ -51,9 +50,16 @@ namespace Cinder.Runtime.World
         void Awake()
         {
             Instance = this;
-            db = GameContent.LoadMaterials(out ownsDatabase);
+            db = GameContent.LoadMaterials();
+            if (db == null)
+            {
+                enabled = false;
+                return;
+            }
             streamer = new WorldStreamer(seed, db);
             engine = new SimulationEngine(streamer.Window, db.Table, seed);
+            engine.AddChannel(new Simulation.Channels.ReactionChannel());
+            engine.AddChannel(new Simulation.Channels.ThermalChannel());
             db.Rebuilt += OnMaterialsRebuilt;
             pool = new ChunkViewPool(transform);
         }
@@ -80,6 +86,7 @@ namespace Cinder.Runtime.World
         void Update()
         {
             HandleModeToggle();
+            HandleResetInput();
             HandleBrushInput();
             HandleEditInput();
 
@@ -125,6 +132,54 @@ namespace Cinder.Runtime.World
             }
         }
 
+        void HandleResetInput()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb != null && kb.rKey.wasPressedThisFrame)
+                ResetWorld();
+        }
+
+        /// <summary>
+        /// 世界重置：清存档、重建模拟（全新生成的地形），
+        /// 玩家销毁重生，相机回出生点。
+        /// </summary>
+        void ResetWorld()
+        {
+            foreach (ChunkView view in views.Values)
+                pool.Release(view);
+            views.Clear();
+            staleKeys.Clear();
+
+            engine.Dispose();
+            streamer.DeleteSaveData();
+            streamer.Dispose();
+
+            streamer = new WorldStreamer(seed, db);
+            engine = new SimulationEngine(streamer.Window, db.Table, seed);
+            engine.AddChannel(new Simulation.Channels.ReactionChannel());
+            engine.AddChannel(new Simulation.Channels.ThermalChannel());
+
+            if (player != null)
+            {
+                // 先停用再销毁：旧流式器已释放，避免旧玩家同帧 Update 访问失效数据
+                player.gameObject.SetActive(false);
+                Destroy(player.gameObject);
+                player = null;
+            }
+            freeFly = false;
+            if (flyCam != null) flyCam.enabled = false;
+
+            int spawnY = WorldGenerator.SurfaceHeight(0, seed) + 30;
+            if (cam != null) cam.transform.position = new Vector3(0f, spawnY, -10f);
+            streamer.SetFocus(0, spawnY);
+
+            if (spawnPlayer && cam != null)
+            {
+                int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
+                player = PlayerController.Spawn(streamer, cam, new Vector2(0.5f, groundY));
+            }
+        }
+
         void FollowPlayer()
         {
             if (player == null || freeFly) return;
@@ -151,6 +206,8 @@ namespace Cinder.Runtime.World
             else if (kb.digit8Key.wasPressedThisFrame) brushMaterial = BrushOrder[7];
             else if (kb.digit9Key.wasPressedThisFrame) brushMaterial = BrushOrder[8];
             else if (kb.digit0Key.wasPressedThisFrame) brushMaterial = BrushOrder[9];
+            else if (kb.minusKey.wasPressedThisFrame) brushMaterial = BrushOrder[10];
+            else if (kb.equalsKey.wasPressedThisFrame) brushMaterial = BrushOrder[11];
         }
 
         void HandleEditInput()
@@ -255,12 +312,12 @@ namespace Cinder.Runtime.World
                     equipped.Append(' ').Append(player.Equipment.Get(slot)?.DisplayName);
                 if (equipped.Length == 3) equipped.Append(" (G 戒指 / H 核心)");
                 GUILayout.Label(equipped.ToString());
-                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)} (1-0)   AD走/空格跳/左键施法/右键挖/Shift+右键放/F自由视角");
+                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)} (1-0/-/=)   AD走/空格跳/左键施法/右键挖/Shift+右键放/F自由视角/R重置");
             }
             else
             {
-                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)}   (数字键 1-7 选择)");
-                GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放");
+                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)}   (数字键 1-0/-/= 选择)");
+                GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放 / R 重置世界");
             }
             GUILayout.EndArea();
         }
@@ -268,14 +325,14 @@ namespace Cinder.Runtime.World
         void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            engine?.Dispose();
             streamer?.SaveAll();
             streamer?.Dispose();
             if (db != null)
             {
                 db.Rebuilt -= OnMaterialsRebuilt;
-                // 资产常驻，仅释放原生表；代码创建的实例才销毁
+                // 数据库是常驻资产，仅释放原生查找表
                 db.DisposeTable();
-                if (ownsDatabase) Destroy(db);
             }
         }
     }

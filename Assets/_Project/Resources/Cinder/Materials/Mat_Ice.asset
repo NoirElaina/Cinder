@@ -10,27 +10,29 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5ce6fb51501550b458391c927a9e2554, type: 3}
-  m_Name: Mat_Steam
+  m_Name: Mat_Ice
   m_EditorClassIdentifier: Cinder.Runtime::Cinder.Runtime.Materials.MaterialDefinition
-  Id: 10
-  DisplayName: "\u84B8\u6C7D"
-  Type: 4
-  Density: 10
-  Fluidity: 180
+  Id: 13
+  DisplayName: "\u51B0"
+  Type: 1
+  Density: 92
+  Fluidity: 0
   Flammability: 0
   BaseLife: 0
   Palette:
   - serializedVersion: 2
-    rgba: 4291676360
+    rgba: 4294302890
   - serializedVersion: 2
-    rgba: 4292663255
-  Conductivity: 30
+    rgba: 4294633150
+  - serializedVersion: 2
+    rgba: 4293971350
+  Conductivity: 110
   SelfTempK: 0
   IgnitePointK: 0
-  MeltPointK: 0
+  MeltPointK: 300
   BoilPointK: 0
   FreezePointK: 0
   BurnsInto: {fileID: 0}
-  MeltsInto: {fileID: 0}
+  MeltsInto: {fileID: 11400000, guid: 117dd28b81a8444a83829ca4f2137e68, type: 2}
   BoilsInto: {fileID: 0}
   FreezesInto: {fileID: 0}

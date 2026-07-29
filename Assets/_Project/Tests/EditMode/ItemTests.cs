@@ -4,9 +4,46 @@ using Cinder.Game.Characters;
 using Cinder.Game.Items;
 using Cinder.Game.Spells;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace Cinder.Tests
 {
+    /// <summary>测试用物品夹具：测试内容自建，不依赖任何资产。</summary>
+    static class TestItems
+    {
+        public static ItemDefinition MakeRing()
+        {
+            var ring = ScriptableObject.CreateInstance<ItemDefinition>();
+            ring.ModuleId = "item.swift_ring";
+            ring.DisplayName = "迅捷戒指";
+            ring.EquipSlot = "charm1";
+            ring.Modifiers = new[]
+            {
+                new AttributeModifierEntry
+                    { Attribute = CharacterAttributes.MoveSpeed, Op = ModifierOp.Multiply, Value = 1.5f },
+                new AttributeModifierEntry
+                    { Attribute = CharacterAttributes.JumpStrength, Op = ModifierOp.Add, Value = 6f },
+            };
+            return ring;
+        }
+
+        public static ItemDefinition MakeCore()
+        {
+            var core = ScriptableObject.CreateInstance<ItemDefinition>();
+            core.ModuleId = "item.mana_core";
+            core.DisplayName = "聚能核心";
+            core.EquipSlot = "charm2";
+            core.Modifiers = new[]
+            {
+                new AttributeModifierEntry
+                    { Attribute = WandAttributes.ManaMax, Op = ModifierOp.Multiply, Value = 1.5f },
+                new AttributeModifierEntry
+                    { Attribute = WandAttributes.ManaRegen, Op = ModifierOp.Add, Value = 30f },
+            };
+            return core;
+        }
+    }
+
     public class EquipmentTests
     {
         AttributeSet characterSet;
@@ -24,8 +61,8 @@ namespace Cinder.Tests
             wandSet.GetOrAdd(WandAttributes.ManaMax).SetBase(100f);
             equipment = new Equipment(id =>
                 id != null && id.StartsWith("wand.") ? wandSet : characterSet);
-            ring = ItemFactory.CreateDemoRing();
-            core = ItemFactory.CreateDemoCore();
+            ring = TestItems.MakeRing();
+            core = TestItems.MakeCore();
         }
 
         [TearDown]
@@ -57,7 +94,7 @@ namespace Cinder.Tests
         [Test]
         public void Equip_SameSlot_SwapsAndCleansOldSource()
         {
-            var ring2 = ItemFactory.CreateDemoRing();
+            var ring2 = TestItems.MakeRing();
             try
             {
                 equipment.Equip(ring);
@@ -86,8 +123,8 @@ namespace Cinder.Tests
         public void AddRemove_EventsAndCapacity()
         {
             var inventory = new Inventory(1);
-            var a = ItemFactory.CreateDemoRing();
-            var b = ItemFactory.CreateDemoCore();
+            var a = TestItems.MakeRing();
+            var b = TestItems.MakeCore();
             try
             {
                 var events = new List<string>();
