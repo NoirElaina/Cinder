@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Cinder.Runtime.Materials;
+using Cinder.Runtime.Player;
 using Cinder.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -17,6 +18,7 @@ namespace Cinder.Runtime.World
         [SerializeField] int seed = 1337;
         [SerializeField] float ticksPerSecond = 30f;
         [SerializeField] int brushRadius = 5;
+        [SerializeField] bool spawnPlayer = true;
 
         static readonly ushort[] BrushOrder =
         {
@@ -33,6 +35,9 @@ namespace Cinder.Runtime.World
         readonly List<long> staleKeys = new List<long>();
 
         Camera cam;
+        FlyCamera flyCam;
+        PlayerController player;
+        bool freeFly;
         float tickAccumulator;
         ushort brushMaterial = BuiltinMaterials.Sand;
 
@@ -55,16 +60,24 @@ namespace Cinder.Runtime.World
         {
             cam = Camera.main;
             if (cam != null && cam.GetComponent<FlyCamera>() == null)
-                cam.gameObject.AddComponent<FlyCamera>();
+                flyCam = cam.gameObject.AddComponent<FlyCamera>();
             int spawnY = WorldGenerator.SurfaceHeight(0, seed) + 30;
             if (cam != null) cam.transform.position = new Vector3(0f, spawnY, -10f);
             streamer.SetFocus(0, spawnY);
+
+            if (spawnPlayer && cam != null)
+            {
+                int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
+                player = PlayerController.Spawn(streamer, cam, new Vector2(0.5f, groundY));
+                if (flyCam != null) flyCam.enabled = false;
+            }
         }
 
         void OnMaterialsRebuilt() => engine.Table = db.Table;
 
         void Update()
         {
+            HandleModeToggle();
             HandleBrushInput();
             HandleEditInput();
 
@@ -91,10 +104,35 @@ namespace Cinder.Runtime.World
         void LateUpdate()
         {
             if (cam == null) return;
+            FollowPlayer();
             Vector3 p = cam.transform.position;
             streamer.SetFocus(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
             streamer.ProcessPendingLoads(3);
             UpdateViews();
+        }
+
+        void HandleModeToggle()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb == null || player == null) return;
+            if (kb.fKey.wasPressedThisFrame)
+            {
+                freeFly = !freeFly;
+                if (flyCam != null) flyCam.enabled = freeFly;
+                if (player != null) player.InputEnabled = !freeFly;
+            }
+        }
+
+        void FollowPlayer()
+        {
+            if (player == null || freeFly) return;
+            Vector3 target = player.transform.position;
+            Vector3 pos = cam.transform.position;
+            float t = 1f - Mathf.Exp(-6f * Time.deltaTime);
+            cam.transform.position = new Vector3(
+                Mathf.Lerp(pos.x, target.x, t),
+                Mathf.Lerp(pos.y, target.y, t),
+                -10f);
         }
 
         void HandleBrushInput()
@@ -114,8 +152,14 @@ namespace Cinder.Runtime.World
         {
             Mouse mouse = Mouse.current;
             if (mouse == null || cam == null) return;
-            bool dig = mouse.leftButton.isPressed;
-            bool place = mouse.rightButton.isPressed;
+            // 有玩家时左键留给法杖；右键挖掘，Shift+右键放置笔刷物质
+            bool shift = Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed;
+            bool dig = player == null
+                ? mouse.rightButton.isPressed || mouse.leftButton.isPressed
+                : mouse.rightButton.isPressed && !shift;
+            bool place = player == null
+                ? mouse.rightButton.isPressed
+                : mouse.rightButton.isPressed && shift;
             if (!dig && !place) return;
 
             Vector3 screen = mouse.position.ReadValue();
@@ -198,8 +242,16 @@ namespace Cinder.Runtime.World
             GUILayout.Label($"FPS {Fps}   Tick {engine?.Tick ?? 0}");
             Vector3 p = cam != null ? cam.transform.position : Vector3.zero;
             GUILayout.Label($"相机 ({p.x:F0}, {p.y:F0})   驻留区块 {streamer?.Grid.LoadedCount ?? 0}   视图 {views.Count}");
-            GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)}   (数字键 1-7 选择)");
-            GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放");
+            if (player != null)
+            {
+                GUILayout.Label($"生命 {player.Character.CurrentHealth:F0}   法力 {player.Wand.CurrentMana:F0}   状态 {player.Character.Fsm.Current?.Name}");
+                GUILayout.Label("AD 移动 / 空格跳 / 左键施法 / 右键挖 / Shift+右键放 / F 自由视角");
+            }
+            else
+            {
+                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)}   (数字键 1-7 选择)");
+                GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放");
+            }
             GUILayout.EndArea();
         }
 

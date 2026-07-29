@@ -2,6 +2,8 @@
     "name": "Cinder.Runtime",
     "rootNamespace": "Cinder.Runtime",
     "references": [
+        "Cinder.Core",
+        "Cinder.Game",
         "Cinder.Simulation",
         "Unity.InputSystem"
     ],

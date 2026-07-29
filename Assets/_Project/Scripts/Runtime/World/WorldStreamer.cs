@@ -82,6 +82,28 @@ namespace Cinder.Runtime.World
 
         byte[] LoadBytes(int chunkX, int chunkY) => store.TryLoad(chunkX, chunkY);
 
+        /// <summary>世界格是否在当前模拟窗口内。</summary>
+        public bool ContainsCell(int worldX, int worldY) => Window.ContainsCell(worldX, worldY);
+
+        /// <summary>读取世界格物质 Id；窗口外返回 ushort.MaxValue。</summary>
+        public ushort GetMaterialAt(int worldX, int worldY) =>
+            Window.ContainsCell(worldX, worldY)
+                ? Window.GetCell(worldX, worldY).MaterialId
+                : ushort.MaxValue;
+
+        /// <summary>
+        /// 世界格是否可站立（静态固体/粉末为固体；液体/气体/火可穿过；
+        /// 窗口外视为固体，防止实体离开活跃区域）。
+        /// </summary>
+        public bool IsSolidCell(int worldX, int worldY)
+        {
+            if (!Window.ContainsCell(worldX, worldY)) return true;
+            ushort id = Window.GetCell(worldX, worldY).MaterialId;
+            if (id == 0) return false;
+            MatterType type = db.Table[id].Type;
+            return type == MatterType.StaticSolid || type == MatterType.Powder;
+        }
+
         void SyncResidents()
         {
             int minCx = Window.OriginChunkX - ResidentRadiusX;

@@ -2,7 +2,8 @@
     "name": "Cinder.Game",
     "rootNamespace": "Cinder.Game",
     "references": [
-        "Cinder.Core"
+        "Cinder.Core",
+        "Cinder.Simulation"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

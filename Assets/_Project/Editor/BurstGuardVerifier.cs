@@ -22,6 +22,9 @@ namespace Cinder.EditorTools
 
             foreach (Type t in TypeCache.GetTypesWithAttribute<BurstCompileAttribute>())
             {
+                // 只检查我们自己的程序集，Unity 官方包内部类型不归本工具管
+                if (t.Namespace == null || !t.Namespace.StartsWith("Cinder")) continue;
+
                 checkedCount++;
 
                 // 规约 1：必须是 struct。class 会被 Burst 直接忽略。
