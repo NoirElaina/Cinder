@@ -83,7 +83,8 @@ namespace Cinder.Tests
                 rig.Window.SetCell(128, 380, Cell.Of(BuiltinMaterials.Sand));
                 rig.Engine.Step();
             }
-            rig.Ticks(300);
+            // 沙从 y=380 落到底需要约 380 tick，浇注期间只过了 60，补足余量
+            rig.Ticks(450);
 
             Assert.AreEqual(60, rig.Count(BuiltinMaterials.Sand), "沙子数量应守恒");
             rig.Bounds(BuiltinMaterials.Sand, out int minX, out int maxX, out int minY, out _);
