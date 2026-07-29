@@ -199,10 +199,32 @@ namespace Cinder.Tests
                 chain = plusFive.Decorate(chain); // 命中钩子应穿透外层
 
                 var spec = new ProjectileSpec { DigPower = 1 };
-                chain.OnHitWorld(ref spec, 0, 0, 0);
-                Assert.AreEqual(5, spec.DigPower);
+                var bus = new EffectBus();
+                var recorder = new RecordingHandler(EffectKind.Explosion);
+                bus.AddHandler(recorder);
+
+                chain.OnHitWorld(ref spec, new ProjectileHit(10, 20, 0, bus));
+                Assert.AreEqual(0, spec.DigPower, "基础挖掘半径应并入爆炸请求");
+                Assert.AreEqual(1, bus.PendingCount, "命中应入队一个爆炸请求");
+
+                bus.Flush(null);
+                Assert.AreEqual(1, recorder.Requests.Count);
+                Assert.AreEqual(5, recorder.Requests[0].Radius, "爆炸半径 = 挖掘 1 + 追加 4");
+                Assert.AreEqual(10, recorder.Requests[0].CellX);
+                Assert.AreEqual(20, recorder.Requests[0].CellY);
             }
             finally { Object.DestroyImmediate(bomb); }
+        }
+
+        sealed class RecordingHandler : IEffectHandler
+        {
+            public readonly List<EffectRequest> Requests = new List<EffectRequest>();
+
+            public RecordingHandler(EffectKind kind) => Kind = kind;
+
+            public EffectKind Kind { get; }
+
+            public void Handle(in EffectRequest request, IEffectWorld world) => Requests.Add(request);
         }
     }
 

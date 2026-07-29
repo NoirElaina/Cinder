@@ -14,8 +14,14 @@ namespace Cinder.Simulation.Channels
         /// <summary>环境温度（约 17 摄氏度）。</summary>
         public const short AmbientK = 290;
 
+        /// <summary>温度场上限（K），外部加热与扩散都钳制在此范围内。</summary>
+        public const short MaxK = 6000;
+
         NativeArray<short> tempRead;
         NativeArray<short> tempWrite;
+
+        /// <summary>外部热源（效果总线/编辑器等）累积的温度变化，下个 tick 生效。</summary>
+        NativeArray<int> pendingDelta;
 
         public string Name => "温度";
         public bool Enabled { get; set; } = true;
@@ -26,11 +32,22 @@ namespace Cinder.Simulation.Channels
             int count = width * height;
             tempRead = new NativeArray<short>(count, Allocator.Persistent);
             tempWrite = new NativeArray<short>(count, Allocator.Persistent);
+            pendingDelta = new NativeArray<int>(count, Allocator.Persistent);
             ResetToAmbient();
         }
 
         /// <summary>移位后重置：自热物质下一 tick 会自行回到 SelfTempK。</summary>
-        public void OnWindowShifted() => ResetToAmbient();
+        public void OnWindowShifted()
+        {
+            ResetToAmbient();
+            for (int i = 0; i < pendingDelta.Length; i++) pendingDelta[i] = 0;
+        }
+
+        /// <summary>
+        /// 外部施加温度变化（K，可负）。只累积不立即写场，
+        /// 下个 tick 扩散前统一结算，保证模拟时序确定。
+        /// </summary>
+        public void AddHeat(int flatIndex, int deltaK) => pendingDelta[flatIndex] += deltaK;
 
         void ResetToAmbient()
         {
@@ -44,6 +61,7 @@ namespace Cinder.Simulation.Channels
         public void Step(in SimChannelContext ctx)
         {
             (tempRead, tempWrite) = (tempWrite, tempRead);
+            ApplyPending();
             new ThermalJob
             {
                 Cells = ctx.Cells,
@@ -60,10 +78,23 @@ namespace Cinder.Simulation.Channels
             }.Run();
         }
 
+        void ApplyPending()
+        {
+            for (int i = 0; i < pendingDelta.Length; i++)
+            {
+                int delta = pendingDelta[i];
+                if (delta == 0) continue;
+                pendingDelta[i] = 0;
+                int t = tempRead[i] + delta;
+                tempRead[i] = (short)(t < 0 ? 0 : t > MaxK ? MaxK : t);
+            }
+        }
+
         public void Dispose()
         {
             if (tempRead.IsCreated) tempRead.Dispose();
             if (tempWrite.IsCreated) tempWrite.Dispose();
+            if (pendingDelta.IsCreated) pendingDelta.Dispose();
         }
     }
 }

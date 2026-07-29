@@ -2,11 +2,14 @@ using UnityEngine;
 
 namespace Cinder.Game.Effects
 {
-    /// <summary>爆炸效果：命中世界时追加挖掘半径，演示 OnHitWorld 钩子。</summary>
+    /// <summary>
+    /// 爆炸效果：命中世界时入队爆炸请求（挖除外环 + 心区点燃 + 加热）。
+    /// 基础挖掘半径并入爆炸半径，爆炸处理器自带地形破坏。
+    /// </summary>
     [CreateAssetMenu(menuName = "Cinder/Effects/Explosive Effect")]
     public sealed class ExplosiveEffect : ProjectileEffectDefinition
     {
-        [Min(0)] public int RadiusAdd = 4;
+        [Min(1)] public int RadiusAdd = 4;
 
         public override IProjectileBehavior Decorate(IProjectileBehavior inner) =>
             new Decorator(inner, RadiusAdd);
@@ -24,10 +27,12 @@ namespace Cinder.Game.Effects
 
             public void ModifySpec(ref ProjectileSpec spec) => inner.ModifySpec(ref spec);
 
-            public void OnHitWorld(ref ProjectileSpec spec, int cellX, int cellY, ushort hitMaterial)
+            public void OnHitWorld(ref ProjectileSpec spec, in ProjectileHit hit)
             {
-                inner.OnHitWorld(ref spec, cellX, cellY, hitMaterial);
-                spec.DigPower += radiusAdd;
+                inner.OnHitWorld(ref spec, hit);
+                hit.Emit(EffectRequest.Explosion(hit.CellX, hit.CellY,
+                    spec.DigPower + radiusAdd));
+                spec.DigPower = 0; // 爆炸自带地形破坏，避免与基础挖掘重复
             }
         }
     }

@@ -81,6 +81,9 @@ namespace Cinder.Simulation
             return ly * Width + lx;
         }
 
+        /// <summary>世界格 -> 平坦数组下标（供通道平行数组寻址，需先确认 ContainsCell）。</summary>
+        public int FlatIndexOf(int worldX, int worldY) => IndexOf(worldX, worldY);
+
         public Cell GetCell(int worldX, int worldY) => read[IndexOf(worldX, worldY)];
 
         /// <summary>外部编辑（挖掘/放置）。写当前缓冲并唤醒所在区块。</summary>

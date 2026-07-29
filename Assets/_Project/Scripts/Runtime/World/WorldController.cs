@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Cinder.Game.Effects;
 using Cinder.Runtime.Materials;
 using Cinder.Runtime.Player;
 using Cinder.Simulation;
@@ -31,6 +32,9 @@ namespace Cinder.Runtime.World
         MaterialDatabase db;
         WorldStreamer streamer;
         SimulationEngine engine;
+        Simulation.Channels.ThermalChannel thermalChannel;
+        EffectBus effectBus;
+        SimEffectWorld effectWorld;
         ChunkViewPool pool;
         readonly Dictionary<long, ChunkView> views = new Dictionary<long, ChunkView>();
         readonly List<long> staleKeys = new List<long>();
@@ -56,12 +60,33 @@ namespace Cinder.Runtime.World
                 enabled = false;
                 return;
             }
+            effectBus = CreateEffectBus();
+            BuildSimulation();
+            db.Rebuilt += OnMaterialsRebuilt;
+            pool = new ChunkViewPool(transform);
+        }
+
+        /// <summary>效果总线 + 全部内置处理器。热插拔点：运行时增删 Handler 即可。</summary>
+        static EffectBus CreateEffectBus()
+        {
+            var bus = new EffectBus();
+            bus.AddHandler(new DigHandler());
+            bus.AddHandler(new ExplosionHandler());
+            bus.AddHandler(new HeatHandler());
+            bus.AddHandler(new FreezeHandler());
+            bus.AddHandler(new IgniteHandler());
+            return bus;
+        }
+
+        /// <summary>（重）建模拟内核：流式器 + 引擎 + 物理场通道 + 效果世界。</summary>
+        void BuildSimulation()
+        {
             streamer = new WorldStreamer(seed, db);
             engine = new SimulationEngine(streamer.Window, db.Table, seed);
             engine.AddChannel(new Simulation.Channels.ReactionChannel());
-            engine.AddChannel(new Simulation.Channels.ThermalChannel());
-            db.Rebuilt += OnMaterialsRebuilt;
-            pool = new ChunkViewPool(transform);
+            thermalChannel = new Simulation.Channels.ThermalChannel();
+            engine.AddChannel(thermalChannel);
+            effectWorld = new SimEffectWorld(streamer.Window, thermalChannel, db.Table, (uint)seed);
         }
 
         void Start()
@@ -76,12 +101,16 @@ namespace Cinder.Runtime.World
             if (spawnPlayer && cam != null)
             {
                 int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
-                player = PlayerController.Spawn(streamer, cam, new Vector2(0.5f, groundY));
+                player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
                 if (flyCam != null) flyCam.enabled = false;
             }
         }
 
-        void OnMaterialsRebuilt() => engine.Table = db.Table;
+        void OnMaterialsRebuilt()
+        {
+            engine.Table = db.Table;
+            effectWorld.Table = db.Table;
+        }
 
         void Update()
         {
@@ -117,6 +146,9 @@ namespace Cinder.Runtime.World
             Vector3 p = cam.transform.position;
             streamer.SetFocus(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
             streamer.ProcessPendingLoads(3);
+            // 效果请求在 tick 间隙统一执行：此时没有模拟 Job 在飞，
+            // 写世界安全，且本帧 UpdateViews 能直接看到脏区块
+            effectBus.Flush(effectWorld);
             UpdateViews();
         }
 
@@ -154,10 +186,7 @@ namespace Cinder.Runtime.World
             streamer.DeleteSaveData();
             streamer.Dispose();
 
-            streamer = new WorldStreamer(seed, db);
-            engine = new SimulationEngine(streamer.Window, db.Table, seed);
-            engine.AddChannel(new Simulation.Channels.ReactionChannel());
-            engine.AddChannel(new Simulation.Channels.ThermalChannel());
+            BuildSimulation();
 
             if (player != null)
             {
@@ -176,7 +205,7 @@ namespace Cinder.Runtime.World
             if (spawnPlayer && cam != null)
             {
                 int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
-                player = PlayerController.Spawn(streamer, cam, new Vector2(0.5f, groundY));
+                player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
             }
         }
 

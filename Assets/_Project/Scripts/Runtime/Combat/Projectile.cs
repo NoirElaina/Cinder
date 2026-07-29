@@ -6,20 +6,22 @@ namespace Cinder.Runtime.Combat
 {
     /// <summary>
     /// 投射物：按 ProjectileSpec 飞行（速度/重力/寿命），沿路径采样世界格，
-    /// 命中固体时走行为装饰链的 OnHitWorld（爆炸挖掘等），支持拖尾物质。
+    /// 命中固体时走行为装饰链的 OnHitWorld，效果（挖掘/爆炸/点燃…）
+    /// 统一入队效果总线，由处理器在 tick 间隙执行。支持拖尾物质。
     /// </summary>
     public sealed class Projectile : MonoBehaviour
     {
         static Sprite sharedSprite;
 
         WorldStreamer streamer;
+        EffectBus effectBus;
         IProjectileBehavior behavior;
         ProjectileSpec spec;
         Vector2 velocity;
         float lifeLeft;
 
-        public static Projectile Spawn(WorldStreamer streamer, IProjectileBehavior behavior,
-            in ProjectileSpec spec, Vector2 origin, Vector2 direction)
+        public static Projectile Spawn(WorldStreamer streamer, EffectBus effectBus,
+            IProjectileBehavior behavior, in ProjectileSpec spec, Vector2 origin, Vector2 direction)
         {
             EnsureSprite();
             var go = new GameObject("Projectile");
@@ -32,6 +34,7 @@ namespace Cinder.Runtime.Combat
 
             var p = go.AddComponent<Projectile>();
             p.streamer = streamer;
+            p.effectBus = effectBus;
             p.behavior = behavior ?? BaseProjectileBehavior.Instance;
             p.spec = spec;
             p.velocity = direction.normalized * spec.Speed;
@@ -87,16 +90,18 @@ namespace Cinder.Runtime.Combat
 
         void OnHit(int cellX, int cellY)
         {
-            behavior.OnHitWorld(ref spec, cellX, cellY, streamer.GetMaterialAt(cellX, cellY));
+            var hit = new ProjectileHit(cellX, cellY,
+                streamer.GetMaterialAt(cellX, cellY), effectBus);
+            behavior.OnHitWorld(ref spec, hit);
             if (spec.DigPower > 0)
-                streamer.EditSphere(cellX, cellY, spec.DigPower, 0);
+                hit.Emit(EffectRequest.Dig(cellX, cellY, spec.DigPower));
 
             // 触发弹：在命中点向下释放载荷法术（清空 TriggerPayload，不递归）
             if (spec.TriggerPayload != null)
             {
                 ProjectileSpec payload = spec.TriggerPayload.BaseSpec;
                 payload.TriggerPayload = null;
-                Spawn(streamer, BaseProjectileBehavior.Instance, payload,
+                Spawn(streamer, effectBus, BaseProjectileBehavior.Instance, payload,
                     new Vector2(cellX + 0.5f, cellY + 0.5f), Vector2.down);
             }
             Destroy(gameObject);

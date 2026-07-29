@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Cinder.Game.Characters;
+using Cinder.Game.Effects;
 using Cinder.Game.Items;
 using Cinder.Game.Physics;
 using Cinder.Game.Spells;
@@ -19,6 +20,7 @@ namespace Cinder.Runtime.Player
         const float Gravity = 90f;
 
         WorldStreamer streamer;
+        EffectBus effectBus;
         Camera cam;
         PixelBody body;
         SpriteRenderer spriteRenderer;
@@ -35,7 +37,8 @@ namespace Cinder.Runtime.Player
         /// <summary>自由视角时置 false：人物不再响应移动/开火，但仍受物理模拟。</summary>
         public bool InputEnabled { get; set; } = true;
 
-        public static PlayerController Spawn(WorldStreamer streamer, Camera cam, Vector2 feetPosition)
+        public static PlayerController Spawn(WorldStreamer streamer, EffectBus effectBus,
+            Camera cam, Vector2 feetPosition)
         {
             var definition = GameContent.LoadPlayerCharacter();
             WandInstance wand = GameContent.LoadStarterWand();
@@ -53,6 +56,7 @@ namespace Cinder.Runtime.Player
 
             var player = go.AddComponent<PlayerController>();
             player.streamer = streamer;
+            player.effectBus = effectBus;
             player.cam = cam;
             player.spriteRenderer = sr;
 
@@ -152,7 +156,7 @@ namespace Cinder.Runtime.Player
                     Vector2 dir = result.AngleOffset != 0f
                         ? Quaternion.Euler(0f, 0f, result.AngleOffset) * baseDirection
                         : baseDirection;
-                    Projectile.Spawn(streamer, result.Behavior, result.Spec, body.Center, dir);
+                    Projectile.Spawn(streamer, effectBus, result.Behavior, result.Spec, body.Center, dir);
                 }
             }
         }

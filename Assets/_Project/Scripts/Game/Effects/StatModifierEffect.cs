@@ -39,8 +39,8 @@ namespace Cinder.Game.Effects
                 spec.DigPower += def.DigPowerAdd;
             }
 
-            public void OnHitWorld(ref ProjectileSpec spec, int cellX, int cellY, ushort hitMaterial) =>
-                inner.OnHitWorld(ref spec, cellX, cellY, hitMaterial);
+            public void OnHitWorld(ref ProjectileSpec spec, in ProjectileHit hit) =>
+                inner.OnHitWorld(ref spec, hit);
         }
     }
 }

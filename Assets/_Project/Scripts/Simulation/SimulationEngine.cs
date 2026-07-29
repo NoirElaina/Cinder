@@ -16,7 +16,7 @@ namespace Cinder.Simulation
         readonly int seed;
         readonly List<ISimChannel> channels = new List<ISimChannel>();
         uint tick;
-        int lastOriginX = int.MinValue;
+        int lastOriginX;
         int lastOriginY;
 
         public SimulationEngine(SimulationWindow window, MaterialTable table, int seed)
@@ -24,6 +24,10 @@ namespace Cinder.Simulation
             this.window = window;
             this.seed = seed;
             Table = table;
+            // 以窗口当前原点为基准：首次 Step 不算移位，
+            // 否则 OnWindowShifted 会清掉通道里排队的外部输入（如热量）
+            lastOriginX = window.OriginChunkX;
+            lastOriginY = window.OriginChunkY;
         }
 
         public MaterialTable Table { get; set; }

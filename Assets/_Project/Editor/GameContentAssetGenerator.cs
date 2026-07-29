@@ -134,6 +134,17 @@ namespace Cinder.EditorTools
             explosive.DisplayName = "爆炸";
             explosive.RadiusAdd = 4;
 
+            var ignite = Create<IgniteEffect>($"{Root}/Effects/Effect_Ignite.asset");
+            ignite.ModuleId = "effect.ignite";
+            ignite.DisplayName = "点燃";
+            ignite.Radius = 2;
+
+            var freeze = Create<FreezeEffect>($"{Root}/Effects/Effect_Freeze.asset");
+            freeze.ModuleId = "effect.freeze";
+            freeze.DisplayName = "冰冻";
+            freeze.Radius = 3;
+            freeze.Kelvin = 600;
+
             // 效果落盘后再建法术引用
             FlushAssets();
 
@@ -178,6 +189,18 @@ namespace Cinder.EditorTools
             modExplosive.DisplayName = "爆裂修饰";
             modExplosive.ManaCost = 8f;
             modExplosive.Effect = explosive;
+
+            var modIgnite = Create<ModifierSpellDefinition>($"{Root}/Spells/Spell_ModIgnite.asset");
+            modIgnite.ModuleId = "spell.mod_ignite";
+            modIgnite.DisplayName = "点燃修饰";
+            modIgnite.ManaCost = 3f;
+            modIgnite.Effect = ignite;
+
+            var modFreeze = Create<ModifierSpellDefinition>($"{Root}/Spells/Spell_ModFreeze.asset");
+            modFreeze.ModuleId = "spell.mod_freeze";
+            modFreeze.DisplayName = "冰冻修饰";
+            modFreeze.ManaCost = 4f;
+            modFreeze.Effect = freeze;
 
             var trigger = Create<TriggerSpellDefinition>($"{Root}/Spells/Spell_TriggerSpark.asset");
             trigger.ModuleId = "spell.trigger_spark";
@@ -245,7 +268,7 @@ namespace Cinder.EditorTools
                 EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
-            Debug.Log($"[Cinder] 内容资产生成完毕：{materials.Count} 物质 + 数据库、3 效果、6 法术、1 法杖、2 物品、1 角色 → {Root}");
+            Debug.Log($"[Cinder] 内容资产生成完毕：{materials.Count} 物质 + 数据库、5 效果、8 法术、1 法杖、2 物品、1 角色 → {Root}");
         }
 
         static MaterialDefinition Mat(string fileName, ushort id, string displayName, MatterType type,
