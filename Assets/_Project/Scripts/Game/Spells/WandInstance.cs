@@ -25,6 +25,10 @@ namespace Cinder.Game.Spells
     {
         readonly List<SpellDefinition> slots = new List<SpellDefinition>();
 
+        /// <summary>核心附加效果（节点图"连到核心"的效果），直接装饰进投射物链。</summary>
+        readonly List<ProjectileEffectDefinition> attachedEffects =
+            new List<ProjectileEffectDefinition>();
+
         float cooldownLeft;
         float rechargeLeft;
 
@@ -48,12 +52,18 @@ namespace Cinder.Game.Spells
 
         public IReadOnlyList<SpellDefinition> Spells => slots;
 
+        /// <summary>核心附加效果列表（节点图装配）。</summary>
+        public IReadOnlyList<ProjectileEffectDefinition> AttachedEffects => attachedEffects;
+
         public float CurrentMana { get; private set; }
 
         public bool CanCast => cooldownLeft <= 0f && rechargeLeft <= 0f;
 
         /// <summary>法术槽变化（热插拔）时触发。</summary>
         public event Action SpellsChanged;
+
+        /// <summary>核心附加效果变化（节点图连线/断线）时触发。</summary>
+        public event Action AttachedEffectsChanged;
 
         /// <summary>每帧推进冷却/充能/法力回复。</summary>
         public void Tick(float deltaTime)
@@ -90,6 +100,33 @@ namespace Cinder.Game.Spells
             return true;
         }
 
+        /// <summary>核心附加效果：挂载一个效果（去重），下次施法生效。</summary>
+        public bool AddAttachedEffect(ProjectileEffectDefinition effect)
+        {
+            if (effect == null || attachedEffects.Contains(effect)) return false;
+            attachedEffects.Add(effect);
+            AttachedEffectsChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>核心附加效果：卸载一个效果。</summary>
+        public bool RemoveAttachedEffect(ProjectileEffectDefinition effect)
+        {
+            if (effect == null || !attachedEffects.Remove(effect)) return false;
+            AttachedEffectsChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>核心附加效果：整体替换为给定集合（去重、去 null）。</summary>
+        public void SetAttachedEffects(IEnumerable<ProjectileEffectDefinition> effects)
+        {
+            attachedEffects.Clear();
+            if (effects != null)
+                foreach (ProjectileEffectDefinition e in effects)
+                    if (e != null && !attachedEffects.Contains(e)) attachedEffects.Add(e);
+            AttachedEffectsChanged?.Invoke();
+        }
+
         /// <summary>
         /// 尝试施法。成功时 results 填入本次全部投射物并扣法力/进入冷却；
         /// 失败（冷却中/法力不足/无投射物法术）返回 false 且无副作用。
@@ -102,6 +139,10 @@ namespace Cinder.Game.Spells
 
             float manaCost = 0f;
             IProjectileBehavior chain = BaseProjectileBehavior.Instance;
+            // 核心附加效果（节点图连线）：作为底层全局修饰先装饰进链，
+            // 再叠加法术槽的修饰符——"连到核心的效果"作用于全部投射物。
+            foreach (ProjectileEffectDefinition effect in attachedEffects)
+                if (effect != null) chain = effect.Decorate(chain);
             var pending = new List<CastResult>(slots.Count);
             int multicast = 0;
             float multicastSpread = 0f;

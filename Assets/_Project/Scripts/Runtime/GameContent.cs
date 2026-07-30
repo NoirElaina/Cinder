@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Cinder.Game.Characters;
+using Cinder.Game.Effects;
 using Cinder.Game.Items;
 using Cinder.Game.Spells;
 using Cinder.Runtime.Materials;
@@ -45,6 +46,15 @@ namespace Cinder.Runtime
             if (ring != null) items.Add(ring);
             if (core != null) items.Add(core);
             return items.ToArray();
+        }
+
+        /// <summary>全部效果资产（Cinder/Effects 下），供效果背包/拾取物使用。缺失仅告警。</summary>
+        public static ProjectileEffectDefinition[] LoadAllEffects()
+        {
+            ProjectileEffectDefinition[] all = Resources.LoadAll<ProjectileEffectDefinition>("Cinder/Effects");
+            if (all == null || all.Length == 0)
+                Debug.LogWarning("[Cinder] 未找到效果资产: Assets/_Project/Resources/Cinder/Effects（运行菜单 Cinder → Generate Game Content Assets 生成）");
+            return all;
         }
 
         static T Load<T>(string path, bool required) where T : Object

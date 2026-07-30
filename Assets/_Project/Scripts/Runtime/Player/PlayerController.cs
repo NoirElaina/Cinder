@@ -4,6 +4,7 @@ using Cinder.Game.Effects;
 using Cinder.Game.Items;
 using Cinder.Game.Physics;
 using Cinder.Game.Spells;
+using Cinder.Game.Weapons;
 using Cinder.Runtime.Combat;
 using Cinder.Runtime.World;
 using UnityEngine;
@@ -30,6 +31,9 @@ namespace Cinder.Runtime.Player
         public WandInstance Wand { get; private set; }
         public Inventory Inventory { get; private set; }
         public Equipment Equipment { get; private set; }
+
+        /// <summary>效果背包：拾取到的投射物效果，画布节点图的拖拽源。</summary>
+        public EffectStash EffectStash { get; private set; }
 
         ItemDefinition demoRing;
         ItemDefinition demoCore;
@@ -66,6 +70,7 @@ namespace Cinder.Runtime.Player
 
             // 演示物品：入包 + 装备系统（属性修饰按 wand. 前缀路由）
             player.Inventory = new Inventory(12);
+            player.EffectStash = new EffectStash();
             ItemDefinition[] starterItems = GameContent.LoadStarterItems();
             player.demoRing = starterItems.Length > 0 ? starterItems[0] : null;
             player.demoCore = starterItems.Length > 1 ? starterItems[1] : null;

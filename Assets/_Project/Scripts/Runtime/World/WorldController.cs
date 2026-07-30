@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Cinder.Game.Effects;
 using Cinder.Runtime.Materials;
 using Cinder.Runtime.Player;
+using Cinder.Runtime.UI;
 using Cinder.Simulation;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -51,6 +52,9 @@ namespace Cinder.Runtime.World
         int fpsFrames;
 
         public int Fps { get; private set; }
+
+        /// <summary>当前玩家（效果拾取物/装配画布据此访问）。</summary>
+        public PlayerController Player => player;
 
         void Awake()
         {
@@ -104,6 +108,25 @@ namespace Cinder.Runtime.World
                 int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
                 player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
                 if (flyCam != null) flyCam.enabled = false;
+                SetupWeaponCanvasAndPickups(groundY);
+            }
+        }
+
+        /// <summary>挂载武器装配画布，并在玩家附近摆放演示效果拾取物（重置时先清旧拾取物）。</summary>
+        void SetupWeaponCanvasAndPickups(int groundY)
+        {
+            WeaponCanvasController canvas = GetComponent<WeaponCanvasController>();
+            if (canvas == null) canvas = gameObject.AddComponent<WeaponCanvasController>();
+            canvas.Bind(player);
+
+            foreach (EffectPickup old in FindObjectsByType<EffectPickup>(FindObjectsSortMode.None))
+                Destroy(old.gameObject);
+            ProjectileEffectDefinition[] effects = GameContent.LoadAllEffects();
+            for (int i = 0; i < effects.Length; i++)
+            {
+                float x = 0.5f + (i - (effects.Length - 1) * 0.5f) * 6f;
+                Color color = Color.HSVToRGB((i * 0.17f) % 1f, 0.6f, 0.95f);
+                EffectPickup.Spawn(effects[i], new Vector2(x, groundY + 1f), color);
             }
         }
 
@@ -235,6 +258,7 @@ namespace Cinder.Runtime.World
             {
                 int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
                 player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
+                SetupWeaponCanvasAndPickups(groundY);
             }
         }
 
@@ -270,6 +294,8 @@ namespace Cinder.Runtime.World
 
         void HandleEditInput()
         {
+            // 装配画布开启时，鼠标交给画布（右键删节点/断线），不挖世界
+            if (WeaponCanvasController.IsOpen) return;
             Mouse mouse = Mouse.current;
             if (mouse == null || cam == null) return;
             // 有玩家时左键留给法杖；右键挖掘，Shift+右键放置笔刷物质
