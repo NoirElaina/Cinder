@@ -29,7 +29,7 @@ MonoBehaviour:
   Conductivity: 110
   SelfTempK: 0
   IgnitePointK: 0
-  MeltPointK: 300
+  MeltPointK: 274
   BoilPointK: 0
   FreezePointK: 0
   BurnsInto: {fileID: 0}

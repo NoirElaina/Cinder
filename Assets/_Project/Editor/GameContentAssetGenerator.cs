@@ -53,7 +53,7 @@ namespace Cinder.EditorTools
             var oil = Mat("Mat_Oil", BuiltinMaterials.Oil, "油", MatterType.Liquid, 90, fluidity: 200, flammability: 60,
                 colors: C(45, 35, 30, 55, 42, 32, 38, 30, 26));
             var acid = Mat("Mat_Acid", BuiltinMaterials.Acid, "酸液", MatterType.Liquid, 110, fluidity: 210,
-                colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95));
+                baseLife: 8, colors: C(80, 220, 80, 60, 200, 70, 100, 235, 95));
             var steam = Mat("Mat_Steam", BuiltinMaterials.Steam, "蒸汽", MatterType.Gas, 10, fluidity: 180,
                 colors: C(200, 200, 205, 215, 215, 220));
             var smoke = Mat("Mat_Smoke", BuiltinMaterials.Smoke, "烟", MatterType.Gas, 15, fluidity: 120, baseLife: 150,
@@ -89,7 +89,8 @@ namespace Cinder.EditorTools
             water.FreezePointK = 273;
             water.FreezesInto = ice;
             ice.Conductivity = 110;
-            ice.MeltPointK = 300;
+            // 熔点 274K（≈1℃）：与水凝固点 273K 留 1K 死区；环境温度 290K 高于它，冰会自然融化
+            ice.MeltPointK = 274;
             ice.MeltsInto = water;
 
             var materials = new List<MaterialDefinition>
@@ -113,10 +114,12 @@ namespace Cinder.EditorTools
             reactionList.arraySize = 6;
             SetReaction(reactionList.GetArrayElementAtIndex(0), lava, water, 0.9f, outA: rock, outB: steam);
             SetReaction(reactionList.GetArrayElementAtIndex(1), lava, ice, 0.9f, outA: rock, outB: water);
-            SetReaction(reactionList.GetArrayElementAtIndex(2), acid, rock, 0.25f, consumeB: true);
-            SetReaction(reactionList.GetArrayElementAtIndex(3), acid, dirt, 0.3f, consumeB: true);
-            SetReaction(reactionList.GetArrayElementAtIndex(4), acid, sand, 0.3f, consumeB: true);
-            SetReaction(reactionList.GetArrayElementAtIndex(5), acid, wood, 0.3f, consumeB: true);
+            // 酸腐蚀：被腐蚀方立即消失（consumeB），酸按预算渐进消耗（consumeA + costA=1，
+            // 预算来自 Mat_Acid.BaseLife），耗尽即消失，不再一路钻到基岩
+            SetReaction(reactionList.GetArrayElementAtIndex(2), acid, rock, 0.25f, consumeA: true, consumeB: true, costA: 1);
+            SetReaction(reactionList.GetArrayElementAtIndex(3), acid, dirt, 0.3f, consumeA: true, consumeB: true, costA: 1);
+            SetReaction(reactionList.GetArrayElementAtIndex(4), acid, sand, 0.3f, consumeA: true, consumeB: true, costA: 1);
+            SetReaction(reactionList.GetArrayElementAtIndex(5), acid, wood, 0.3f, consumeA: true, consumeB: true, costA: 1);
             so.ApplyModifiedPropertiesWithoutUndo();
 
             // ---- 效果 ----
@@ -343,7 +346,7 @@ namespace Cinder.EditorTools
 
         static void SetReaction(SerializedProperty entry, MaterialDefinition a, MaterialDefinition b,
             float chance, MaterialDefinition outA = null, MaterialDefinition outB = null,
-            bool consumeA = false, bool consumeB = false)
+            bool consumeA = false, bool consumeB = false, int costA = 0, int costB = 0)
         {
             entry.FindPropertyRelative("A").objectReferenceValue = a;
             entry.FindPropertyRelative("B").objectReferenceValue = b;
@@ -352,6 +355,8 @@ namespace Cinder.EditorTools
             entry.FindPropertyRelative("OutB").objectReferenceValue = outB;
             entry.FindPropertyRelative("ConsumeA").boolValue = consumeA;
             entry.FindPropertyRelative("ConsumeB").boolValue = consumeB;
+            entry.FindPropertyRelative("CostA").intValue = costA;
+            entry.FindPropertyRelative("CostB").intValue = costB;
         }
     }
 }

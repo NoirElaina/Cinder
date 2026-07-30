@@ -18,7 +18,7 @@ MonoBehaviour:
   Density: 110
   Fluidity: 210
   Flammability: 0
-  BaseLife: 0
+  BaseLife: 8
   Palette:
   - serializedVersion: 2
     rgba: 4283489360

@@ -46,26 +46,34 @@ MonoBehaviour:
     Chance: 0.25
     OutA: {fileID: 0}
     OutB: {fileID: 0}
-    ConsumeA: 0
+    ConsumeA: 1
     ConsumeB: 1
+    CostA: 1
+    CostB: 0
   - A: {fileID: 11400000, guid: 0f4ce697f6c14795b3c2197992a40a66, type: 2}
     B: {fileID: 11400000, guid: 9e3a5228fb7e48c3967ad0f4c19d9b19, type: 2}
     Chance: 0.3
     OutA: {fileID: 0}
     OutB: {fileID: 0}
-    ConsumeA: 0
+    ConsumeA: 1
     ConsumeB: 1
+    CostA: 1
+    CostB: 0
   - A: {fileID: 11400000, guid: 0f4ce697f6c14795b3c2197992a40a66, type: 2}
     B: {fileID: 11400000, guid: ab4c034c19154e8c89611354a1feaccf, type: 2}
     Chance: 0.3
     OutA: {fileID: 0}
     OutB: {fileID: 0}
-    ConsumeA: 0
+    ConsumeA: 1
     ConsumeB: 1
+    CostA: 1
+    CostB: 0
   - A: {fileID: 11400000, guid: 0f4ce697f6c14795b3c2197992a40a66, type: 2}
     B: {fileID: 11400000, guid: 05c16352374f4d649a59bee41b31c46e, type: 2}
     Chance: 0.3
     OutA: {fileID: 0}
     OutB: {fileID: 0}
-    ConsumeA: 0
+    ConsumeA: 1
     ConsumeB: 1
+    CostA: 1
+    CostB: 0

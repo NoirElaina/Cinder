@@ -130,10 +130,21 @@ namespace Cinder.Simulation
 
         public void Clear(ushort id) => props[id] = default;
 
-        /// <summary>注册一条双向反应：A 遇 B 以 chance/255 概率变为 outA/outB（与自身同 Id = 不变）。</summary>
-        public void SetReaction(ushort a, ushort b, byte chance, ushort outA, ushort outB)
+        /// <summary>
+        /// 注册一条双向反应：A 遇 B 以 chance/255 概率反应。outA/outB 为产物
+        /// （与自身同 Id = 不变）。costA/costB &gt; 0 时该反应物按 State 预算渐进消耗，
+        /// 耗尽才变成对应 out（用于"酸腐蚀有上限"）。MatA/MatB 记录参与者，
+        /// 让产物落格与方位无关。对称写入，双向查询等价。
+        /// </summary>
+        public void SetReaction(ushort a, ushort b, byte chance, ushort outA, ushort outB,
+            byte costA = 0, byte costB = 0)
         {
-            var rule = new ReactionRule { Exists = 1, Chance = chance, OutA = outA, OutB = outB };
+            var rule = new ReactionRule
+            {
+                Exists = 1, Chance = chance,
+                MatA = a, MatB = b, OutA = outA, OutB = outB,
+                CostA = costA, CostB = costB,
+            };
             reactions[a * Capacity + b] = rule;
             reactions[b * Capacity + a] = rule;
         }
@@ -178,7 +189,11 @@ namespace Cinder.Simulation
                 IgnitePointK = 520, BurnsInto = BuiltinMaterials.Fire,
             });
             table.Set(BuiltinMaterials.Acid, new MaterialProps
-                { Type = MatterType.Liquid, Density = 110, Fluidity = 210, Conductivity = 100 });
+            {
+                Type = MatterType.Liquid, Density = 110, Fluidity = 210, Conductivity = 100,
+                // 腐蚀预算：每格酸可腐蚀的固体数，耗尽即消失（BaseLife 经笔刷初始化 State）
+                BaseLife = 8,
+            });
             table.Set(BuiltinMaterials.Steam, new MaterialProps
                 { Type = MatterType.Gas, Density = 10, Fluidity = 180, Conductivity = 30 });
             table.Set(BuiltinMaterials.Smoke, new MaterialProps
@@ -188,7 +203,9 @@ namespace Cinder.Simulation
             table.Set(BuiltinMaterials.Ice, new MaterialProps
             {
                 Type = MatterType.StaticSolid, Density = 92, Conductivity = 110,
-                MeltPointK = 300, MeltsInto = BuiltinMaterials.Water,
+                // 熔点 274K（≈1℃）：与水凝固点 273K 留 1K 死区避免抖动；
+                // 环境温度 290K 高于它，冰在室温会自然融化回水（修复冰永不融化）。
+                MeltPointK = 274, MeltsInto = BuiltinMaterials.Water,
             });
 
             // 内置反应（对称写入）：岩浆淬水成岩 + 蒸汽；酸腐蚀常规固体
@@ -196,14 +213,16 @@ namespace Cinder.Simulation
                 BuiltinMaterials.Rock, BuiltinMaterials.Steam);
             table.SetReaction(BuiltinMaterials.Lava, BuiltinMaterials.Ice, 230,
                 BuiltinMaterials.Rock, BuiltinMaterials.Water);
+            // 酸腐蚀固体：被腐蚀方立即消失（outB=Empty），酸自身按预算渐进消耗
+            // （costA=1，耗尽成 Empty），因此酸有腐蚀上限，不会一路钻到基岩。
             table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Rock, 60,
-                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+                BuiltinMaterials.Empty, BuiltinMaterials.Empty, costA: 1);
             table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Dirt, 76,
-                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+                BuiltinMaterials.Empty, BuiltinMaterials.Empty, costA: 1);
             table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Sand, 76,
-                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+                BuiltinMaterials.Empty, BuiltinMaterials.Empty, costA: 1);
             table.SetReaction(BuiltinMaterials.Acid, BuiltinMaterials.Wood, 76,
-                BuiltinMaterials.Acid, BuiltinMaterials.Empty);
+                BuiltinMaterials.Empty, BuiltinMaterials.Empty, costA: 1);
             return table;
         }
     }

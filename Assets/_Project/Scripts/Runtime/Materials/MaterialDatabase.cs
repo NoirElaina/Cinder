@@ -29,6 +29,11 @@ namespace Cinder.Runtime.Materials
             public bool ConsumeA;
             [Tooltip("勾选则反应消耗 B")]
             public bool ConsumeB;
+
+            [Tooltip("A 每次反应消耗的 State 预算；0 = 立即转变，>0 = 渐进消耗（配合物质 BaseLife 作预算）")]
+            [Range(0, 255)] public int CostA;
+            [Tooltip("B 每次反应消耗的 State 预算；0 = 立即转变，>0 = 渐进消耗")]
+            [Range(0, 255)] public int CostB;
         }
 
         [SerializeField] List<MaterialDefinition> materials = new List<MaterialDefinition>();
@@ -69,7 +74,9 @@ namespace Cinder.Runtime.Materials
                 ushort b = e.B.MaterialId;
                 ushort outA = e.ConsumeA ? BuiltinMaterials.Empty : (e.OutA != null ? e.OutA.MaterialId : a);
                 ushort outB = e.ConsumeB ? BuiltinMaterials.Empty : (e.OutB != null ? e.OutB.MaterialId : b);
-                Table.SetReaction(a, b, (byte)Mathf.RoundToInt(Mathf.Clamp01(e.Chance) * 255f), outA, outB);
+                byte costA = (byte)Mathf.Clamp(e.CostA, 0, 255);
+                byte costB = (byte)Mathf.Clamp(e.CostB, 0, 255);
+                Table.SetReaction(a, b, (byte)Mathf.RoundToInt(Mathf.Clamp01(e.Chance) * 255f), outA, outB, costA, costB);
             }
             Rebuilt?.Invoke();
         }
