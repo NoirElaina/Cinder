@@ -43,6 +43,7 @@ namespace Cinder.Runtime.World
         FlyCamera flyCam;
         PlayerController player;
         bool freeFly;
+        int debugView; // 0 = 普通, 1 = 温度热力图
         float tickAccumulator;
         ushort brushMaterial = BuiltinMaterials.Sand;
 
@@ -115,6 +116,7 @@ namespace Cinder.Runtime.World
         void Update()
         {
             HandleModeToggle();
+            HandleDebugViewInput();
             HandleResetInput();
             HandleBrushInput();
             HandleEditInput();
@@ -162,6 +164,33 @@ namespace Cinder.Runtime.World
                 if (flyCam != null) flyCam.enabled = freeFly;
                 if (player != null) player.InputEnabled = !freeFly;
             }
+        }
+
+        /// <summary>F1 普通视图 / F2 温度热力图（缺氧式调试视图，可继续扩展 F3+）。</summary>
+        void HandleDebugViewInput()
+        {
+            Keyboard kb = Keyboard.current;
+            if (kb == null) return;
+            int next = debugView;
+            if (kb.f1Key.wasPressedThisFrame) next = 0;
+            else if (kb.f2Key.wasPressedThisFrame) next = 1;
+            if (next == debugView) return;
+            debugView = next;
+            // 切换视图后全量重绘
+            foreach (ChunkView view in views.Values)
+                view.PendingRedraw = true;
+        }
+
+        /// <summary>温度覆盖层取色：250K 深蓝 → 环境青 → 燃点黄 → 1400K+ 近白红。</summary>
+        Color32 TempOverlay(int flatIndex, Cell cell)
+        {
+            short k = thermalChannel != null ? thermalChannel.GetTempK(flatIndex) : Simulation.Channels.ThermalChannel.AmbientK;
+            float f = Mathf.InverseLerp(250f, 1400f, k);
+            float hue = Mathf.Lerp(0.62f, 0f, f);
+            float sat = Mathf.Lerp(0.9f, 0.25f, f * f);
+            // 空气也着色但调暗：隔空的热量能直接在热力图里看到
+            float val = cell.MaterialId == BuiltinMaterials.Empty ? 0.45f : Mathf.Lerp(0.55f, 1f, f);
+            return Color.HSVToRGB(hue, sat, val);
         }
 
         void HandleResetInput()
@@ -263,7 +292,8 @@ namespace Cinder.Runtime.World
 
         void UpdateViews()
         {
-            const int MaxRedrawsPerFrame = 4;
+            // 调试视图下温度每 tick 都在变，放开重绘预算逐帧刷新
+            int maxRedrawsPerFrame = debugView == 0 ? 4 : 64;
             int redraws = 0;
 
             Vector3 center = cam.transform.position;
@@ -298,17 +328,25 @@ namespace Cinder.Runtime.World
 
                     int windowIndex = streamer.Window.WindowChunkIndex(cx, cy);
                     bool dirty = inWindow
-                        ? view.PendingRedraw || streamer.Window.ChunkDirty[windowIndex] == 1
+                        ? view.PendingRedraw || streamer.Window.ChunkDirty[windowIndex] == 1 || debugView != 0
                         : view.PendingRedraw;
-                    if (!dirty || redraws >= MaxRedrawsPerFrame) continue;
+                    if (!dirty || redraws >= maxRedrawsPerFrame) continue;
 
                     if (inWindow)
                     {
                         int start = ((cy - streamer.Window.OriginChunkY) * SimCoords.ChunkSize)
                             * streamer.Window.Width
                             + (cx - streamer.Window.OriginChunkX) * SimCoords.ChunkSize;
-                        view.RedrawFromWindow(streamer.Window.ReadArray,
-                            streamer.Window.Width, start, db);
+                        if (debugView == 1)
+                        {
+                            view.RedrawFromWindowOverlay(streamer.Window.ReadArray,
+                                streamer.Window.Width, start, TempOverlay);
+                        }
+                        else
+                        {
+                            view.RedrawFromWindow(streamer.Window.ReadArray,
+                                streamer.Window.Width, start, db);
+                        }
                         streamer.Window.ChunkDirty[windowIndex] = 0;
                     }
                     else
@@ -341,12 +379,49 @@ namespace Cinder.Runtime.World
                     equipped.Append(' ').Append(player.Equipment.Get(slot)?.DisplayName);
                 if (equipped.Length == 3) equipped.Append(" (G 戒指 / H 核心)");
                 GUILayout.Label(equipped.ToString());
-                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)} (1-0/-/=)   AD走/空格跳/左键施法/右键挖/Shift+右键放/F自由视角/R重置");
+                GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)} (1-0/-/=)   AD走/空格跳/左键施法/右键挖/Shift+右键放/F自由视角/R重置/F1普通/F2温度");
             }
             else
             {
                 GUILayout.Label($"笔刷: {db?.GetName(brushMaterial)}   (数字键 1-0/-/= 选择)");
-                GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放 / R 重置世界");
+                GUILayout.Label("左键挖掘 / 右键放置 / WASD 移动 / Shift 加速 / 滚轮缩放 / R 重置世界 / F1 普通 / F2 温度");
+            }
+            GUILayout.EndArea();
+            DrawProbePanel();
+        }
+
+        /// <summary>鼠标探针：显示指针所在格的物质与各物理场通道数据（缺氧式）。</summary>
+        void DrawProbePanel()
+        {
+            Mouse mouse = Mouse.current;
+            if (mouse == null || cam == null || streamer == null || engine == null) return;
+            Vector3 screen = mouse.position.ReadValue();
+            screen.z = -cam.transform.position.z;
+            Vector3 world = cam.ScreenToWorldPoint(screen);
+            int cx = Mathf.FloorToInt(world.x);
+            int cy = Mathf.FloorToInt(world.y);
+
+            GUILayout.BeginArea(new Rect(10, 165, 360, 105), GUI.skin.box);
+            GUILayout.Label($"鼠标格 ({cx}, {cy})   视图: {(debugView == 0 ? "普通" : "温度")}");
+            if (!streamer.Window.ContainsCell(cx, cy))
+            {
+                GUILayout.Label("窗口外（区块未驻留）");
+            }
+            else
+            {
+                int flat = streamer.Window.FlatIndexOf(cx, cy);
+                Cell cell = streamer.Window.ReadArray[flat];
+                GUILayout.Label($"物质 {db.GetName(cell.MaterialId)}   寿命 {cell.State}   变体 {cell.Variant}");
+                // 各物理场通道的探针行：实现 ISimProbe 的通道自动出现在这里
+                foreach (ISimChannel channel in engine.Channels)
+                {
+                    if (channel is ISimProbe probe)
+                        GUILayout.Label($"{channel.Name}  {probe.ProbeLine(flat)}");
+                }
+                // ChunkAwake 按窗口局部区块索引，须先换算（负坐标直接移位会越界）
+                int ci = streamer.Window.WindowChunkIndex(
+                    cx >> SimCoords.ChunkShift, cy >> SimCoords.ChunkShift);
+                GUILayout.Label($"区块 {(streamer.Window.ChunkAwake[ci] == 1 ? "唤醒" : "休眠")}");
             }
             GUILayout.EndArea();
         }

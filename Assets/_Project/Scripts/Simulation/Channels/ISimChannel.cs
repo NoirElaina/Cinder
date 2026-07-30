@@ -44,4 +44,13 @@ namespace Cinder.Simulation
         /// <summary>执行一个 tick 的场求解（主线程顺序执行，保证确定性）。</summary>
         void Step(in SimChannelContext ctx);
     }
+
+    /// <summary>
+    /// 通道调试探针（可选实现）：返回该通道在指定格的一行物理数据，用于 HUD。
+    /// 新通道实现本接口即自动出现在调试面板，表现层零改动。
+    /// </summary>
+    public interface ISimProbe
+    {
+        string ProbeLine(int flatIndex);
+    }
 }

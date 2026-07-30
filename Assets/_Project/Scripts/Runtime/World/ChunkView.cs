@@ -64,6 +64,26 @@ namespace Cinder.Runtime.World
             Upload();
         }
 
+        /// <summary>调试视图取色委托：给定窗口平坦索引与格子，返回像素色。</summary>
+        public delegate Color32 OverlayColor(int flatIndex, Cell cell);
+
+        /// <summary>以调试覆盖层（温度图等）重绘：颜色完全由覆盖层决定。</summary>
+        public void RedrawFromWindowOverlay(NativeArray<Cell> windowCells, int windowWidth,
+            int startIndex, OverlayColor overlay)
+        {
+            for (int ly = 0; ly < Size; ly++)
+            {
+                int srcRow = startIndex + ly * windowWidth;
+                int dstRow = ly * Size;
+                for (int lx = 0; lx < Size; lx++)
+                {
+                    int flat = srcRow + lx;
+                    pixels[dstRow + lx] = overlay(flat, windowCells[flat]);
+                }
+            }
+            Upload();
+        }
+
         void Upload()
         {
             texture.SetPixels32(pixels);

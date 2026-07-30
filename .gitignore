@@ -9,6 +9,8 @@
 [Mm]emoryCaptures/
 [Rr]ecordings/
 
+
+.workbuddy
 # IDE
 .idea/
 .vscode/

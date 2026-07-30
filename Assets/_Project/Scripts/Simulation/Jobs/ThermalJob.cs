@@ -52,8 +52,15 @@ namespace Cinder.Simulation.Jobs
                         int k = c.MaterialId == BuiltinMaterials.Empty ? 40 : p.Conductivity;
                         int cur = TempRead[i];
                         int avg = n > 0 ? sum / n : cur;
-                        int next = cur + (avg - cur) * k / 255;
-                        next += (AmbientK - next) / 512;
+                        // 四邻热量交换：带符号向上取整，避免弱梯度被整数除法吞掉而卡死
+                        int diff = avg - cur;
+                        int exch = diff >= 0 ? (diff * k + 254) / 255 : (diff * k - 254) / 255;
+                        int next = cur + exch;
+                        // 环境回落：同样的带符号取整，保证温度最终收敛到环境温度，
+                        // 而不是在 |ΔT|<512K 时被截断为 0 而永久停在环境温度上方。
+                        int pull = AmbientK - next;
+                        int regress = pull >= 0 ? (pull + 511) / 512 : (pull - 511) / 512;
+                        next += regress;
                         t = (short)next;
                     }
                     TempWrite[i] = t;

@@ -9,7 +9,7 @@ namespace Cinder.Simulation.Channels
     /// （点燃/熔化/沸腾/凝固，全部由 MaterialProps 热学字段声明）。
     /// 温度存自持平行数组，双缓冲读写保证确定性。
     /// </summary>
-    public sealed class ThermalChannel : ISimChannel
+    public sealed class ThermalChannel : ISimChannel, ISimProbe
     {
         /// <summary>环境温度（约 17 摄氏度）。</summary>
         public const short AmbientK = 290;
@@ -48,6 +48,19 @@ namespace Cinder.Simulation.Channels
         /// 下个 tick 扩散前统一结算，保证模拟时序确定。
         /// </summary>
         public void AddHeat(int flatIndex, int deltaK) => pendingDelta[flatIndex] += deltaK;
+
+        /// <summary>读取某格当前温度（K）。供调试视图与探针使用。</summary>
+        public short GetTempK(int flatIndex)
+        {
+            if (!tempWrite.IsCreated || flatIndex < 0 || flatIndex >= tempWrite.Length) return AmbientK;
+            return tempWrite[flatIndex];
+        }
+
+        public string ProbeLine(int flatIndex)
+        {
+            short k = GetTempK(flatIndex);
+            return $"{k}K ({k - 273}℃)";
+        }
 
         void ResetToAmbient()
         {
