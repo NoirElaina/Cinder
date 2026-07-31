@@ -31,6 +31,7 @@ namespace Cinder.Simulation
         public NativeArray<byte> ChunkDirty;
 
         readonly bool[] movedScratch;
+        readonly byte[] awakeScratch;
 
         public SimulationWindow(int chunksX, int chunksY, int originChunkX, int originChunkY)
         {
@@ -46,6 +47,7 @@ namespace Cinder.Simulation
             ChunkMoved = new NativeArray<int>(chunkCount, Allocator.Persistent);
             ChunkDirty = new NativeArray<byte>(chunkCount, Allocator.Persistent);
             movedScratch = new bool[chunkCount];
+            awakeScratch = new byte[chunkCount];
             for (int i = 0; i < chunkCount; i++)
             {
                 ChunkAwake[i] = 1;
@@ -139,41 +141,48 @@ namespace Cinder.Simulation
         }
 
         /// <summary>
-        /// 把窗口平移到新的原点（以区块为单位）。离开区域的区块写回 WorldGrid
-        /// （标记 Modified），进入区域的区块从 WorldGrid 检出；
+        /// 把窗口平移到新的原点（以区块为单位）。零分配：新内容直接组装进
+        /// write 缓冲（两个 tick 之间其内容无意义，可安全复用）后与 read 互换。
+        /// 离开区域的区块写回 WorldGrid（标记 Modified），进入区域的从 WorldGrid 检出；
         /// 世界 Y 范围之外填基岩（下方）或空（上方）。
+        /// 平移保留携带区块的休眠状态，只唤醒新检出的区块——
+        /// 否则持续移动 = 整窗永远全量模拟。
         /// </summary>
         public void Shift(int newOriginX, int newOriginY, WorldGrid grid,
             Func<int, int, byte[]> diskLoader)
         {
-            int cellCount = Width * Height;
-            var newRead = new NativeArray<Cell>(cellCount, Allocator.Persistent);
-            var newWrite = new NativeArray<Cell>(cellCount, Allocator.Persistent);
+            // 1. 快照旧布局的休眠状态（ChunkAwake 随后按新布局重写）
+            for (int i = 0; i < ChunkCount; i++) awakeScratch[i] = ChunkAwake[i];
 
-            // 1. 填充新窗口
+            // 2. 组装新窗口到 write 缓冲
             for (int ncy = 0; ncy < ChunksY; ncy++)
             {
                 for (int ncx = 0; ncx < ChunksX; ncx++)
                 {
                     int gcx = newOriginX + ncx;
                     int gcy = newOriginY + ncy;
+                    int newIndex = ncy * ChunksX + ncx;
                     int dstStart = (ncy * SimCoords.ChunkSize) * Width + ncx * SimCoords.ChunkSize;
 
                     if (ContainsChunk(gcx, gcy))
                     {
-                        // 旧窗口内平移拷贝
-                        int srcStart = ((gcy - OriginChunkY) * SimCoords.ChunkSize) * Width
-                            + (gcx - OriginChunkX) * SimCoords.ChunkSize;
-                        CopyChunkStrided(read, srcStart, Width, newRead, dstStart, Width);
+                        // 旧窗口内平移拷贝，休眠状态随区块携带
+                        int oldCx = gcx - OriginChunkX;
+                        int oldCy = gcy - OriginChunkY;
+                        int srcStart = (oldCy * SimCoords.ChunkSize) * Width
+                            + oldCx * SimCoords.ChunkSize;
+                        CopyChunkStrided(read, srcStart, Width, write, dstStart, Width);
+                        ChunkAwake[newIndex] = awakeScratch[oldCy * ChunksX + oldCx];
                     }
                     else
                     {
-                        LoadChunkInto(newRead, dstStart, gcx, gcy, grid, diskLoader);
+                        LoadChunkInto(write, dstStart, gcx, gcy, grid, diskLoader);
+                        ChunkAwake[newIndex] = 1;
                     }
                 }
             }
 
-            // 2. 换出离开区域的区块
+            // 3. 换出离开区域的区块（仍从 read 读，与第 2 步互不重叠）
             for (int ocy = 0; ocy < ChunksY; ocy++)
             {
                 for (int ocx = 0; ocx < ChunksX; ocx++)
@@ -192,16 +201,12 @@ namespace Cinder.Simulation
                 }
             }
 
-            // 3. 替换缓冲并复位标记
-            read.Dispose();
-            write.Dispose();
-            read = newRead;
-            write = newWrite;
+            // 4. 互换双缓冲并复位标记（write 残留旧内容，下个 tick 的序曲会重建）
+            (read, write) = (write, read);
             OriginChunkX = newOriginX;
             OriginChunkY = newOriginY;
             for (int i = 0; i < ChunkCount; i++)
             {
-                ChunkAwake[i] = 1;
                 ChunkMoved[i] = 0;
                 ChunkDirty[i] = 1;
             }

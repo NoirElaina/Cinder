@@ -1,3 +1,4 @@
+using Cinder.Simulation;
 using UnityEngine;
 
 namespace Cinder.Game.Effects
@@ -12,7 +13,7 @@ namespace Cinder.Game.Effects
         public float Gravity;
         public float Lifetime;
 
-        /// <summary>命中世界时的挖掘半径（格），0 = 不破坏地形。</summary>
+        /// <summary>命中世界时的挖掘半径（世界单位），0 = 不破坏地形。</summary>
         public int DigPower;
 
         /// <summary>可穿透的实体/格数。</summary>
@@ -31,6 +32,8 @@ namespace Cinder.Game.Effects
     /// 投射物命中世界的上下文。装饰器通过 Emit 往效果总线入队效果请求
     /// （爆炸/点燃/冰冻…），而不是自己直接改世界——世界写入统一由
     /// 效果处理器在 tick 间隙执行。
+    /// 半径契约：装饰器/资产以世界单位授权半径，Emit 统一换算为细格
+    /// （总线及处理器全部工作在细格）。
     /// </summary>
     public readonly struct ProjectileHit
     {
@@ -50,8 +53,9 @@ namespace Cinder.Game.Effects
             this.bus = bus;
         }
 
-        /// <summary>入队效果请求；无总线时静默丢弃（纯数据测试场景）。</summary>
-        public void Emit(in EffectRequest request) => bus?.Emit(request);
+        /// <summary>入队效果请求（半径世界单位 -> 细格）；无总线时静默丢弃（纯数据测试场景）。</summary>
+        public void Emit(in EffectRequest request) =>
+            bus?.Emit(request.ScaleRadius(WorldScale.CellsPerUnit));
     }
 
     /// <summary>

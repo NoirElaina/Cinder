@@ -24,12 +24,15 @@ namespace Cinder.Simulation.Channels
                 Reactions = ctx.Reactions,
                 Mats = ctx.Mats,
                 Moved = ctx.Moved,
+                Awake = ctx.Awake,
                 Width = ctx.Width,
                 Height = ctx.Height,
                 ChunksX = ctx.ChunksX,
                 TableCapacity = MaterialTable.Capacity,
                 Tick = ctx.Tick,
                 Seed = ctx.Seed,
+                // 休眠块每 8 tick 全量补扫一次，静止的岩浆池/酸不会停摆
+                FullPass = (byte)((ctx.Tick & 7u) == 0u ? 1 : 0),
             }.Run();
         }
 

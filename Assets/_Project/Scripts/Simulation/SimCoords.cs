@@ -1,9 +1,9 @@
 namespace Cinder.Simulation
 {
     /// <summary>
-    /// 世界坐标与区块坐标换算。世界以"格"为单位，一格 = 一像素 = 一个世界单位。
-    /// X 方向无限，Y 方向有限（见 WorldGrid.MinChunkY/MaxChunkY）。
-    /// 负数坐标的换算全部走位运算，语义为 floor。
+    /// 细格坐标与区块坐标换算。格是细物理像素（一个世界单位 = WorldScale.CellsPerUnit 格），
+    /// 世界单位与格的互换只走 WorldScale。X 方向无限，Y 方向有限
+    /// （见 WorldGrid.MinChunkY/MaxChunkY）。负数坐标的换算全部走位运算，语义为 floor。
     /// </summary>
     public static class SimCoords
     {

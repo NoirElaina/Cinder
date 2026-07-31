@@ -1,17 +1,18 @@
-using System.Collections.Generic;
 using Cinder.Game.Effects;
 using Cinder.Runtime.Materials;
 using Cinder.Runtime.Player;
 using Cinder.Runtime.UI;
 using Cinder.Simulation;
+using Cinder.Simulation.Channels;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Cinder.Runtime.World
 {
     /// <summary>
-    /// 世界查看器总控：固定步长驱动模拟、按相机位置流式加载、
-    /// 维护区块视图、处理笔刷输入。任意场景按 Play 即可运行（见 WorldBootstrap）。
+    /// 世界总控：固定步长驱动模拟、按相机位置流式加载、
+    /// 驱动 Cell Surface 渲染、处理笔刷输入。任意场景按 Play 即可运行（见 WorldBootstrap）。
+    /// 相机/角色用世界单位，模拟/挖掘用细格，换算只走 WorldScale。
     /// </summary>
     public sealed class WorldController : MonoBehaviour
     {
@@ -19,7 +20,9 @@ namespace Cinder.Runtime.World
 
         [SerializeField] int seed = 1337;
         [SerializeField] float ticksPerSecond = 30f;
-        [SerializeField] int brushRadius = 5;
+
+        [Tooltip("笔刷半径（细格）")]
+        [SerializeField] int brushRadius = 12;
         [SerializeField] bool spawnPlayer = true;
 
         static readonly ushort[] BrushOrder =
@@ -33,12 +36,11 @@ namespace Cinder.Runtime.World
         MaterialDatabase db;
         WorldStreamer streamer;
         SimulationEngine engine;
-        Simulation.Channels.ThermalChannel thermalChannel;
+        ThermalChannel thermalChannel;
+        LightChannel lightChannel;
         EffectBus effectBus;
         SimEffectWorld effectWorld;
-        ChunkViewPool pool;
-        readonly Dictionary<long, ChunkView> views = new Dictionary<long, ChunkView>();
-        readonly List<long> staleKeys = new List<long>();
+        CellSurfaceRenderer surface;
 
         Camera cam;
         FlyCamera flyCam;
@@ -47,6 +49,10 @@ namespace Cinder.Runtime.World
         int debugView; // 0 = 普通, 1 = 温度热力图
         float tickAccumulator;
         ushort brushMaterial = BuiltinMaterials.Sand;
+
+        /// <summary>本帧世界内容是否变过（tick/笔刷/效果/窗口平移），
+        /// 未变则渲染器跳过重新打包上传（30tps 下约省一半帧的打包成本）。</summary>
+        bool worldDirty = true;
 
         float fpsTimer;
         int fpsFrames;
@@ -68,7 +74,8 @@ namespace Cinder.Runtime.World
             effectBus = CreateEffectBus();
             BuildSimulation();
             db.Rebuilt += OnMaterialsRebuilt;
-            pool = new ChunkViewPool(transform);
+            surface = CellSurfaceRenderer.Create(transform);
+            surface.Bind(streamer.Window, lightChannel, thermalChannel, db);
         }
 
         /// <summary>效果总线 + 全部内置处理器。热插拔点：运行时增删 Handler 即可。</summary>
@@ -88,9 +95,11 @@ namespace Cinder.Runtime.World
         {
             streamer = new WorldStreamer(seed, db);
             engine = new SimulationEngine(streamer.Window, db.Table, seed);
-            engine.AddChannel(new Simulation.Channels.ReactionChannel());
-            thermalChannel = new Simulation.Channels.ThermalChannel();
+            engine.AddChannel(new ReactionChannel());
+            thermalChannel = new ThermalChannel();
             engine.AddChannel(thermalChannel);
+            lightChannel = new LightChannel();
+            engine.AddChannel(lightChannel);
             effectWorld = new SimEffectWorld(streamer.Window, thermalChannel, db.Table, (uint)seed);
         }
 
@@ -99,21 +108,24 @@ namespace Cinder.Runtime.World
             cam = Camera.main;
             if (cam != null && cam.GetComponent<FlyCamera>() == null)
                 flyCam = cam.gameObject.AddComponent<FlyCamera>();
-            int spawnY = WorldGenerator.SurfaceHeight(0, seed) + 30;
-            if (cam != null) cam.transform.position = new Vector3(0f, spawnY, -10f);
-            streamer.SetFocus(0, spawnY);
+
+            int surfaceCell = WorldGenerator.SurfaceHeight(0, seed);
+            float surfaceY = WorldScale.CellToWorld(surfaceCell);
+            if (cam != null) cam.transform.position = new Vector3(0f, surfaceY + 8f, -10f);
+            streamer.SetFocus(0, surfaceCell + 32);
+            RebuildLight(); // 首帧就有光，不等第一个 tick
 
             if (spawnPlayer && cam != null)
             {
-                int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
-                player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
+                player = PlayerController.Spawn(streamer, effectBus, cam,
+                    new Vector2(0.125f, surfaceY + 2f));
                 if (flyCam != null) flyCam.enabled = false;
-                SetupWeaponCanvasAndPickups(groundY);
+                SetupWeaponCanvasAndPickups(surfaceY);
             }
         }
 
         /// <summary>挂载武器装配画布，并在玩家附近摆放演示效果拾取物（重置时先清旧拾取物）。</summary>
-        void SetupWeaponCanvasAndPickups(int groundY)
+        void SetupWeaponCanvasAndPickups(float groundY)
         {
             WeaponCanvasController canvas = GetComponent<WeaponCanvasController>();
             if (canvas == null) canvas = gameObject.AddComponent<WeaponCanvasController>();
@@ -126,7 +138,7 @@ namespace Cinder.Runtime.World
             {
                 float x = 0.5f + (i - (effects.Length - 1) * 0.5f) * 6f;
                 Color color = Color.HSVToRGB((i * 0.17f) % 1f, 0.6f, 0.95f);
-                EffectPickup.Spawn(effects[i], new Vector2(x, groundY + 1f), color);
+                EffectPickup.Spawn(effects[i], new Vector2(x, groundY + 2f), color);
             }
         }
 
@@ -147,12 +159,16 @@ namespace Cinder.Runtime.World
             tickAccumulator += Time.deltaTime;
             float interval = 1f / Mathf.Max(1f, ticksPerSecond);
             int steps = 0;
-            while (tickAccumulator >= interval && steps < 4)
+            while (tickAccumulator >= interval && steps < 2)
             {
                 engine.Step();
                 tickAccumulator -= interval;
                 steps++;
             }
+            if (steps > 0) worldDirty = true;
+            // 死亡螺旋防护：单 tick 超预算时丢弃积欠时间（模拟慢放），
+            // 绝不允许每帧追更多 tick 把帧率锁死在谷底
+            if (tickAccumulator > interval) tickAccumulator = interval;
 
             fpsFrames++;
             fpsTimer += Time.unscaledDeltaTime;
@@ -169,13 +185,28 @@ namespace Cinder.Runtime.World
             if (cam == null) return;
             FollowPlayer();
             Vector3 p = cam.transform.position;
-            streamer.SetFocus(Mathf.RoundToInt(p.x), Mathf.RoundToInt(p.y));
+            int prevOriginX = streamer.Window.OriginChunkX;
+            int prevOriginY = streamer.Window.OriginChunkY;
+            streamer.SetFocus(WorldScale.WorldToCell(p.x), WorldScale.WorldToCell(p.y));
             streamer.ProcessPendingLoads(3);
+            // 窗口平移后光照场还是旧布局，不等下个 tick，立即重建防闪烁
+            if (streamer.Window.OriginChunkX != prevOriginX
+                || streamer.Window.OriginChunkY != prevOriginY)
+            {
+                RebuildLight();
+                worldDirty = true;
+            }
             // 效果请求在 tick 间隙统一执行：此时没有模拟 Job 在飞，
-            // 写世界安全，且本帧 UpdateViews 能直接看到脏区块
+            // 写世界安全，且本帧 Render 能直接看到最新格子
+            if (effectBus.PendingCount > 0) worldDirty = true;
             effectBus.Flush(effectWorld);
-            UpdateViews();
+            surface.Render(worldDirty);
+            worldDirty = false;
         }
+
+        void RebuildLight() => lightChannel.Rebuild(
+            streamer.Window.ReadArray, db.Table.Native,
+            streamer.Window.Width, streamer.Window.Height);
 
         void HandleModeToggle()
         {
@@ -189,31 +220,14 @@ namespace Cinder.Runtime.World
             }
         }
 
-        /// <summary>F1 普通视图 / F2 温度热力图（缺氧式调试视图，可继续扩展 F3+）。</summary>
+        /// <summary>F1 普通视图 / F2 温度热力图（同一渲染器的调试分支，可继续扩展 F3+）。</summary>
         void HandleDebugViewInput()
         {
             Keyboard kb = Keyboard.current;
             if (kb == null) return;
-            int next = debugView;
-            if (kb.f1Key.wasPressedThisFrame) next = 0;
-            else if (kb.f2Key.wasPressedThisFrame) next = 1;
-            if (next == debugView) return;
-            debugView = next;
-            // 切换视图后全量重绘
-            foreach (ChunkView view in views.Values)
-                view.PendingRedraw = true;
-        }
-
-        /// <summary>温度覆盖层取色：250K 深蓝 → 环境青 → 燃点黄 → 1400K+ 近白红。</summary>
-        Color32 TempOverlay(int flatIndex, Cell cell)
-        {
-            short k = thermalChannel != null ? thermalChannel.GetTempK(flatIndex) : Simulation.Channels.ThermalChannel.AmbientK;
-            float f = Mathf.InverseLerp(250f, 1400f, k);
-            float hue = Mathf.Lerp(0.62f, 0f, f);
-            float sat = Mathf.Lerp(0.9f, 0.25f, f * f);
-            // 空气也着色但调暗：隔空的热量能直接在热力图里看到
-            float val = cell.MaterialId == BuiltinMaterials.Empty ? 0.45f : Mathf.Lerp(0.55f, 1f, f);
-            return Color.HSVToRGB(hue, sat, val);
+            if (kb.f1Key.wasPressedThisFrame) debugView = 0;
+            else if (kb.f2Key.wasPressedThisFrame) debugView = 1;
+            surface.DebugMode = debugView;
         }
 
         void HandleResetInput()
@@ -225,20 +239,16 @@ namespace Cinder.Runtime.World
 
         /// <summary>
         /// 世界重置：清存档、重建模拟（全新生成的地形），
-        /// 玩家销毁重生，相机回出生点。
+        /// 渲染器重绑数据源，玩家销毁重生，相机回出生点。
         /// </summary>
         void ResetWorld()
         {
-            foreach (ChunkView view in views.Values)
-                pool.Release(view);
-            views.Clear();
-            staleKeys.Clear();
-
             engine.Dispose();
             streamer.DeleteSaveData();
             streamer.Dispose();
 
             BuildSimulation();
+            surface.Bind(streamer.Window, lightChannel, thermalChannel, db);
 
             if (player != null)
             {
@@ -250,15 +260,18 @@ namespace Cinder.Runtime.World
             freeFly = false;
             if (flyCam != null) flyCam.enabled = false;
 
-            int spawnY = WorldGenerator.SurfaceHeight(0, seed) + 30;
-            if (cam != null) cam.transform.position = new Vector3(0f, spawnY, -10f);
-            streamer.SetFocus(0, spawnY);
+            int surfaceCell = WorldGenerator.SurfaceHeight(0, seed);
+            float surfaceY = WorldScale.CellToWorld(surfaceCell);
+            if (cam != null) cam.transform.position = new Vector3(0f, surfaceY + 8f, -10f);
+            streamer.SetFocus(0, surfaceCell + 32);
+            RebuildLight();
+            worldDirty = true;
 
             if (spawnPlayer && cam != null)
             {
-                int groundY = WorldGenerator.SurfaceHeight(0, seed) + 4;
-                player = PlayerController.Spawn(streamer, effectBus, cam, new Vector2(0.5f, groundY));
-                SetupWeaponCanvasAndPickups(groundY);
+                player = PlayerController.Spawn(streamer, effectBus, cam,
+                    new Vector2(0.125f, surfaceY + 2f));
+                SetupWeaponCanvasAndPickups(surfaceY);
             }
         }
 
@@ -311,84 +324,11 @@ namespace Cinder.Runtime.World
             Vector3 screen = mouse.position.ReadValue();
             screen.z = -cam.transform.position.z;
             Vector3 world = cam.ScreenToWorldPoint(screen);
-            streamer.EditSphere(Mathf.FloorToInt(world.x), Mathf.FloorToInt(world.y),
-                dig ? brushRadius + 2 : brushRadius,
+            streamer.EditSphere(
+                WorldScale.WorldToCell(world.x), WorldScale.WorldToCell(world.y),
+                dig ? brushRadius + 6 : brushRadius,
                 dig ? BuiltinMaterials.Empty : brushMaterial);
-        }
-
-        void UpdateViews()
-        {
-            // 调试视图下温度每 tick 都在变，放开重绘预算逐帧刷新
-            int maxRedrawsPerFrame = debugView == 0 ? 4 : 64;
-            int redraws = 0;
-
-            Vector3 center = cam.transform.position;
-            float halfH = cam.orthographicSize + SimCoords.ChunkSize;
-            float halfW = halfH * cam.aspect + SimCoords.ChunkSize;
-            int minCx = SimCoords.CellToChunk(Mathf.FloorToInt(center.x - halfW));
-            int maxCx = SimCoords.CellToChunk(Mathf.FloorToInt(center.x + halfW));
-            int minCy = SimCoords.CellToChunk(Mathf.FloorToInt(center.y - halfH));
-            int maxCy = SimCoords.CellToChunk(Mathf.FloorToInt(center.y + halfH));
-
-            staleKeys.AddRange(views.Keys);
-
-            for (int cy = minCy; cy <= maxCy; cy++)
-            {
-                for (int cx = minCx; cx <= maxCx; cx++)
-                {
-                    long key = SimCoords.PackKey(cx, cy);
-                    staleKeys.Remove(key);
-
-                    bool inWindow = streamer.Window.ContainsChunk(cx, cy);
-                    ChunkData stored = null;
-                    if (!inWindow && !streamer.Grid.TryGet(cx, cy, out stored)) continue;
-
-                    if (!views.TryGetValue(key, out ChunkView view))
-                    {
-                        view = pool.Get();
-                        view.transform.position = new Vector3(
-                            SimCoords.ChunkToCellOrigin(cx), SimCoords.ChunkToCellOrigin(cy), 0f);
-                        view.PendingRedraw = true;
-                        views.Add(key, view);
-                    }
-
-                    int windowIndex = streamer.Window.WindowChunkIndex(cx, cy);
-                    bool dirty = inWindow
-                        ? view.PendingRedraw || streamer.Window.ChunkDirty[windowIndex] == 1 || debugView != 0
-                        : view.PendingRedraw;
-                    if (!dirty || redraws >= maxRedrawsPerFrame) continue;
-
-                    if (inWindow)
-                    {
-                        int start = ((cy - streamer.Window.OriginChunkY) * SimCoords.ChunkSize)
-                            * streamer.Window.Width
-                            + (cx - streamer.Window.OriginChunkX) * SimCoords.ChunkSize;
-                        if (debugView == 1)
-                        {
-                            view.RedrawFromWindowOverlay(streamer.Window.ReadArray,
-                                streamer.Window.Width, start, TempOverlay);
-                        }
-                        else
-                        {
-                            view.RedrawFromWindow(streamer.Window.ReadArray,
-                                streamer.Window.Width, start, db);
-                        }
-                        streamer.Window.ChunkDirty[windowIndex] = 0;
-                    }
-                    else
-                    {
-                        view.RedrawFromChunk(stored, db);
-                    }
-                    redraws++;
-                }
-            }
-
-            foreach (long key in staleKeys)
-            {
-                pool.Release(views[key]);
-                views.Remove(key);
-            }
-            staleKeys.Clear();
+            worldDirty = true;
         }
 
         void OnGUI()
@@ -396,7 +336,7 @@ namespace Cinder.Runtime.World
             GUILayout.BeginArea(new Rect(10, 10, 360, 150), GUI.skin.box);
             GUILayout.Label($"FPS {Fps}   Tick {engine?.Tick ?? 0}");
             Vector3 p = cam != null ? cam.transform.position : Vector3.zero;
-            GUILayout.Label($"相机 ({p.x:F0}, {p.y:F0})   驻留区块 {streamer?.Grid.LoadedCount ?? 0}   视图 {views.Count}");
+            GUILayout.Label($"相机 ({p.x:F0}, {p.y:F0})   驻留区块 {streamer?.Grid.LoadedCount ?? 0}");
             if (player != null)
             {
                 GUILayout.Label($"生命 {player.Character.CurrentHealth:F0}   法力 {player.Wand.CurrentMana:F0}   状态 {player.Character.Fsm.Current?.Name}");
@@ -416,7 +356,7 @@ namespace Cinder.Runtime.World
             DrawProbePanel();
         }
 
-        /// <summary>鼠标探针：显示指针所在格的物质与各物理场通道数据（缺氧式）。</summary>
+        /// <summary>鼠标探针：显示指针所在细格的物质与各物理场通道数据（缺氧式）。</summary>
         void DrawProbePanel()
         {
             Mouse mouse = Mouse.current;
@@ -424,10 +364,10 @@ namespace Cinder.Runtime.World
             Vector3 screen = mouse.position.ReadValue();
             screen.z = -cam.transform.position.z;
             Vector3 world = cam.ScreenToWorldPoint(screen);
-            int cx = Mathf.FloorToInt(world.x);
-            int cy = Mathf.FloorToInt(world.y);
+            int cx = WorldScale.WorldToCell(world.x);
+            int cy = WorldScale.WorldToCell(world.y);
 
-            GUILayout.BeginArea(new Rect(10, 165, 360, 105), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10, 165, 360, 120), GUI.skin.box);
             GUILayout.Label($"鼠标格 ({cx}, {cy})   视图: {(debugView == 0 ? "普通" : "温度")}");
             if (!streamer.Window.ContainsCell(cx, cy))
             {

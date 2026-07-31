@@ -7,17 +7,20 @@ namespace Cinder.Runtime.World
 {
     /// <summary>
     /// 世界流式加载：以焦点为中心维护两级区域——
-    /// 模拟窗口（4x3 区块，检出到 SimulationWindow）与驻留环
+    /// 模拟窗口（7x5 区块，检出到 SimulationWindow）与驻留环
     /// （窗口外扩一圈，留在 WorldGrid 供渲染）。环外区块卸载：
     /// 改过的落盘，未改的丢弃（确定性生成可重建）。
     /// </summary>
     public sealed class WorldStreamer : IDisposable
     {
-        public const int WindowChunksX = 4;
-        public const int WindowChunksY = 3;
+        public const int WindowChunksX = 7;
+        public const int WindowChunksY = 5;
+
+        /// <summary>迟滞带在窗口中心区块两侧外扩的格数（防边界来回走时反复移位）。</summary>
+        const int HysteresisCells = 32;
 
         /// <summary>驻留环在窗口四周外扩的区块数。</summary>
-        public int ResidentRadiusX = 3;
+        public int ResidentRadiusX = 2;
         public int ResidentRadiusY = 2;
 
         readonly MaterialDatabase db;
@@ -27,6 +30,7 @@ namespace Cinder.Runtime.World
         /// <summary>待加载的驻留区块（分帧摊销，避免移位卡顿）。</summary>
         readonly Queue<long> pendingResidents = new Queue<long>();
         readonly HashSet<long> pendingSet = new HashSet<long>();
+        readonly List<ChunkData> unloadScratch = new List<ChunkData>();
 
         public WorldGrid Grid { get; }
         public SimulationWindow Window { get; }
@@ -39,23 +43,37 @@ namespace Cinder.Runtime.World
             Window = new SimulationWindow(WindowChunksX, WindowChunksY, 0, 0);
         }
 
-        /// <summary>焦点（格坐标）变化时调用，按需移位窗口并同步驻留环。</summary>
+        /// <summary>焦点（格坐标）变化时调用，按需移位窗口并同步驻留环。
+        /// 迟滞按格粒度：焦点落在中心区块外扩 ±HysteresisCells 的带内不平移，
+        /// 保证任意时刻焦点到窗口四缘的距离有确定下界（相机视野不会越出窗口）。</summary>
         public void SetFocus(int cellX, int cellY)
         {
-            int desiredX = SimCoords.CellToChunk(cellX) - WindowChunksX / 2;
-            int desiredY = SimCoords.CellToChunk(cellY) - WindowChunksY / 2;
+            int focusCx = SimCoords.CellToChunk(cellX);
+            int focusCy = SimCoords.CellToChunk(cellY);
 
             if (!initialized)
             {
-                Window.FillFrom(desiredX, desiredY, Grid, LoadBytes);
+                Window.FillFrom(focusCx - WindowChunksX / 2, focusCy - WindowChunksY / 2,
+                    Grid, LoadBytes);
                 initialized = true;
+                SyncResidents();
             }
-            else if (desiredX != Window.OriginChunkX || desiredY != Window.OriginChunkY)
+            else
             {
-                Window.Shift(desiredX, desiredY, Grid, LoadBytes);
+                int localX = cellX - SimCoords.ChunkToCellOrigin(Window.OriginChunkX);
+                int localY = cellY - SimCoords.ChunkToCellOrigin(Window.OriginChunkY);
+                int minX = (WindowChunksX / 2) * SimCoords.ChunkSize - HysteresisCells;
+                int maxX = (WindowChunksX / 2 + 1) * SimCoords.ChunkSize + HysteresisCells;
+                int minY = (WindowChunksY / 2) * SimCoords.ChunkSize - HysteresisCells;
+                int maxY = (WindowChunksY / 2 + 1) * SimCoords.ChunkSize + HysteresisCells;
+                if (localX < minX || localX >= maxX || localY < minY || localY >= maxY)
+                {
+                    Window.Shift(focusCx - WindowChunksX / 2, focusCy - WindowChunksY / 2,
+                        Grid, LoadBytes);
+                    // 驻留环只在窗口真正移位时才变，每帧同步是白费
+                    SyncResidents();
+                }
             }
-
-            SyncResidents();
         }
 
         /// <summary>圆形笔刷编辑（挖掘/放置），仅作用于模拟窗口内。</summary>
@@ -124,19 +142,20 @@ namespace Cinder.Runtime.World
                 }
             }
 
-            var unload = new List<ChunkData>();
+            unloadScratch.Clear();
             foreach (ChunkData chunk in Grid.Loaded)
             {
                 if (chunk.ChunkX >= minCx && chunk.ChunkX <= maxCx
                     && chunk.ChunkY >= minCy && chunk.ChunkY <= maxCy) continue;
-                unload.Add(chunk);
+                unloadScratch.Add(chunk);
             }
-            foreach (ChunkData chunk in unload)
+            foreach (ChunkData chunk in unloadScratch)
             {
                 Grid.Remove(chunk.ChunkX, chunk.ChunkY);
                 if (chunk.Modified) store.SaveAsync(chunk);
                 chunk.Dispose();
             }
+            unloadScratch.Clear();
         }
 
         /// <summary>

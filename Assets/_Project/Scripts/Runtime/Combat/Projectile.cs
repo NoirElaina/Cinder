@@ -1,5 +1,6 @@
 using Cinder.Game.Effects;
 using Cinder.Runtime.World;
+using Cinder.Simulation;
 using UnityEngine;
 
 namespace Cinder.Runtime.Combat
@@ -29,7 +30,7 @@ namespace Cinder.Runtime.Combat
             sr.sprite = sharedSprite;
             sr.color = spec.Tint;
             sr.sortingOrder = 5;
-            go.transform.localScale = new Vector3(0.6f, 0.6f, 1f);
+            go.transform.localScale = new Vector3(0.3f, 0.3f, 1f);
             go.transform.position = origin;
 
             var p = go.AddComponent<Projectile>();
@@ -62,12 +63,12 @@ namespace Cinder.Runtime.Combat
             Vector2 from = transform.position;
             Vector2 step = velocity * dt;
             float distance = step.magnitude;
-            int samples = Mathf.Max(1, Mathf.CeilToInt(distance / 0.5f));
+            int samples = Mathf.Max(1, Mathf.CeilToInt(distance / WorldScale.UnitsPerCell));
             for (int i = 1; i <= samples; i++)
             {
                 Vector2 p = from + step * (i / (float)samples);
-                int cx = Mathf.FloorToInt(p.x);
-                int cy = Mathf.FloorToInt(p.y);
+                int cx = WorldScale.WorldToCell(p.x);
+                int cy = WorldScale.WorldToCell(p.y);
                 if (streamer.IsSolidCell(cx, cy))
                 {
                     OnHit(cx, cy);
@@ -79,8 +80,8 @@ namespace Cinder.Runtime.Combat
             if (spec.TrailMaterial != 0)
             {
                 streamer.EditSphere(
-                    Mathf.FloorToInt(transform.position.x),
-                    Mathf.FloorToInt(transform.position.y),
+                    WorldScale.WorldToCell(transform.position.x),
+                    WorldScale.WorldToCell(transform.position.y),
                     0, spec.TrailMaterial);
             }
 
@@ -102,7 +103,8 @@ namespace Cinder.Runtime.Combat
                 ProjectileSpec payload = spec.TriggerPayload.BaseSpec;
                 payload.TriggerPayload = null;
                 Spawn(streamer, effectBus, BaseProjectileBehavior.Instance, payload,
-                    new Vector2(cellX + 0.5f, cellY + 0.5f), Vector2.down);
+                    new Vector2(WorldScale.CellCenterToWorld(cellX),
+                        WorldScale.CellCenterToWorld(cellY)), Vector2.down);
             }
             Destroy(gameObject);
         }

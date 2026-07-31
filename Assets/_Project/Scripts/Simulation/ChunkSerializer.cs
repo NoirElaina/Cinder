@@ -7,10 +7,12 @@ namespace Cinder.Simulation
     /// <summary>
     /// 区块二进制序列化：16 字节头（magic/cx/cy/保留）+ 原始 Cell 字节。
     /// 纯函数，不涉及 IO，便于单测。
+    /// CNK2 = 细物理格世界（1 世界单位 = 4 格）。旧版 CNK1 粗格存档不兼容，
+    /// 反序列化直接拒收并重新生成。
     /// </summary>
     public static class ChunkSerializer
     {
-        public const uint Magic = 0x314B4E43; // 'CNK1'
+        public const uint Magic = 0x324B4E43; // 'CNK2'
         public const int HeaderSize = 16;
 
         /// <summary>单格字节数取自真实布局，避免对齐填充假设。</summary>

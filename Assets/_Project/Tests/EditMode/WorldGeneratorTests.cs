@@ -54,11 +54,11 @@ namespace Cinder.Tests
         [Test]
         public void Generate_SkyChunk_AllEmpty()
         {
-            // 地表最高约 50 格，区块 1 覆盖 y 128..255，必然全空
-            var c = new ChunkData(5, 1);
+            // 地表最高约 (8+42)*4+细噪声 ≤ 203 细格，区块 2 覆盖 y 256..383，必然全空
+            var c = new ChunkData(5, 2);
             try
             {
-                WorldGenerator.Generate(5, 1, Seed, MinY, c.Cells);
+                WorldGenerator.Generate(5, 2, Seed, MinY, c.Cells);
                 for (int i = 0; i < c.Cells.Length; i++)
                     Assert.AreEqual(BuiltinMaterials.Empty, c.Cells[i].MaterialId, $"index {i}");
             }
@@ -68,11 +68,11 @@ namespace Cinder.Tests
         [Test]
         public void Generate_BelowSurfaceChunk_HasSolid()
         {
-            // 地表最低约 -34，区块 -1 覆盖 y -128..-1，必然含固体
-            var c = new ChunkData(3, -1);
+            // 地表最低约 -139 细格，区块 -2 覆盖 y -256..-129，必然含固体
+            var c = new ChunkData(3, -2);
             try
             {
-                WorldGenerator.Generate(3, -1, Seed, MinY, c.Cells);
+                WorldGenerator.Generate(3, -2, Seed, MinY, c.Cells);
                 bool anySolid = false;
                 for (int i = 0; i < c.Cells.Length; i++)
                     if (c.Cells[i].MaterialId != BuiltinMaterials.Empty) { anySolid = true; break; }

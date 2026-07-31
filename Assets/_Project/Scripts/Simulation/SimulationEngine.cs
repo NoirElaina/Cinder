@@ -87,6 +87,7 @@ namespace Cinder.Simulation
                     Mats = Table.Native,
                     Reactions = Table.Reactions,
                     Moved = window.ChunkMoved,
+                    Awake = window.ChunkAwake,
                     Width = window.Width,
                     Height = window.Height,
                     ChunksX = window.ChunksX,

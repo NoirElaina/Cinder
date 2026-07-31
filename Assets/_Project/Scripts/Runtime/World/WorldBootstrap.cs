@@ -17,7 +17,7 @@ namespace Cinder.Runtime.World
                 var camGo = new GameObject("Main Camera") { tag = "MainCamera" };
                 var cam = camGo.AddComponent<Camera>();
                 cam.orthographic = true;
-                cam.orthographicSize = 40f;
+                cam.orthographicSize = 34f;
                 cam.clearFlags = CameraClearFlags.SolidColor;
                 cam.backgroundColor = new Color(0.10f, 0.12f, 0.18f);
                 camGo.AddComponent<AudioListener>();

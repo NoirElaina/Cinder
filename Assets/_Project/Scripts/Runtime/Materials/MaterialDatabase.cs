@@ -51,6 +51,18 @@ namespace Cinder.Runtime.Materials
         Color32[][] palettes = new Color32[MaterialTable.Capacity][];
         string[] names = new string[MaterialTable.Capacity];
 
+        /// <summary>每种物质烘培的 GPU 色带数（暗 -> 亮）。</summary>
+        public const int PaletteBands = 8;
+
+        uint[] gpuPalettes = new uint[MaterialTable.Capacity * PaletteBands];
+        uint[] gpuParams = new uint[MaterialTable.Capacity];
+
+        /// <summary>GPU 调色板：[id * PaletteBands + band] = RGBA8（低位 R）。</summary>
+        public uint[] GpuPalettes => gpuPalettes;
+
+        /// <summary>GPU 渲染参数：[0..3] 类型 | [4..11] 自发光 | [12..19] 颗粒 | [20..27] 边光。</summary>
+        public uint[] GpuParams => gpuParams;
+
         public void Rebuild()
         {
             Table?.Dispose();
@@ -78,7 +90,61 @@ namespace Cinder.Runtime.Materials
                 byte costB = (byte)Mathf.Clamp(e.CostB, 0, 255);
                 Table.SetReaction(a, b, (byte)Mathf.RoundToInt(Mathf.Clamp01(e.Chance) * 255f), outA, outB, costA, costB);
             }
+
+            BakeGpuTables();
             Rebuilt?.Invoke();
+        }
+
+        /// <summary>
+        /// 烘培 GPU 视觉表：把资产里的少量调色板色按亮度排序后扩成 8 个色带
+        /// （暗 -> 亮，着色器用团块噪声选带 + 颗粒抖动），并从物理属性派生
+        /// 渲染参数（自发光与 SelfTempK 联动，颗粒/边光按物质类型）。
+        /// </summary>
+        void BakeGpuTables()
+        {
+            gpuPalettes = new uint[MaterialTable.Capacity * PaletteBands];
+            gpuParams = new uint[MaterialTable.Capacity];
+
+            for (int id = 0; id < MaterialTable.Capacity; id++)
+            {
+                Color32[] src = palettes[id];
+                if (src == null || src.Length == 0) continue;
+
+                // 按亮度升序，色带索引即明度索引
+                var sorted = (Color32[])src.Clone();
+                Array.Sort(sorted, (a, b) =>
+                    (a.r * 3 + a.g * 6 + a.b).CompareTo(b.r * 3 + b.g * 6 + b.b));
+
+                for (int band = 0; band < PaletteBands; band++)
+                {
+                    Color32 c = sorted[band * sorted.Length / PaletteBands];
+                    float shade = 0.80f + 0.055f * band; // 0.80 .. 1.19
+                    uint r = (uint)Mathf.Min(255, Mathf.RoundToInt(c.r * shade));
+                    uint g = (uint)Mathf.Min(255, Mathf.RoundToInt(c.g * shade));
+                    uint bb = (uint)Mathf.Min(255, Mathf.RoundToInt(c.b * shade));
+                    gpuPalettes[id * PaletteBands + band] = r | (g << 8) | (bb << 16) | 0xFF000000u;
+                }
+
+                MaterialProps p = Table[(ushort)id];
+                uint kind = (uint)p.Type;
+                uint emission = p.Type == MatterType.Fire ? 255u
+                    : p.SelfTempK > 600 ? (uint)Mathf.Min(255, (p.SelfTempK - 600) * 3 / 10) : 0u;
+                uint grain = p.Type switch
+                {
+                    MatterType.Powder => 90u,
+                    MatterType.StaticSolid => 60u,
+                    MatterType.Liquid => 20u,
+                    _ => 0u,
+                };
+                uint edge = p.Type switch
+                {
+                    MatterType.StaticSolid => 85u,
+                    MatterType.Powder => 60u,
+                    MatterType.Liquid => 120u,
+                    _ => 0u,
+                };
+                gpuParams[id] = kind | (emission << 4) | (grain << 12) | (edge << 20);
+            }
         }
 
         /// <summary>运行时挂载一个物质模块。</summary>

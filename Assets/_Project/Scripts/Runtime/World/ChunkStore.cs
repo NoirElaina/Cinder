@@ -18,7 +18,8 @@ namespace Cinder.Runtime.World
 
         public ChunkStore(int seed)
         {
-            directory = Path.Combine(Application.persistentDataPath, "world", seed.ToString());
+            // v2 = 细物理格世界（CNK2），与旧版粗格存档目录隔离
+            directory = Path.Combine(Application.persistentDataPath, "world", "v2", seed.ToString());
             Directory.CreateDirectory(directory);
         }
 

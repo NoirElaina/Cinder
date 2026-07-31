@@ -8,8 +8,8 @@ namespace Cinder.Runtime.World
     public sealed class FlyCamera : MonoBehaviour
     {
         public float MoveSpeed = 40f;
-        public float MinSize = 8f;
-        public float MaxSize = 160f;
+        public float MinSize = 5f;
+        public float MaxSize = 80f;
 
         Camera cam;
 

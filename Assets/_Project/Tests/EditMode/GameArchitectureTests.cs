@@ -5,6 +5,7 @@ using Cinder.Core.StateMachine;
 using Cinder.Game.Characters;
 using Cinder.Game.Effects;
 using Cinder.Game.Weapons;
+using Cinder.Simulation;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -209,7 +210,9 @@ namespace Cinder.Tests
 
                 bus.Flush(null);
                 Assert.AreEqual(1, recorder.Requests.Count);
-                Assert.AreEqual(5, recorder.Requests[0].Radius, "爆炸半径 = 挖掘 1 + 追加 4");
+                // 半径契约：装饰器以世界单位授权（挖掘 1 + 追加 4），Emit 时换算为细格
+                Assert.AreEqual(5 * WorldScale.CellsPerUnit, recorder.Requests[0].Radius,
+                    "爆炸半径 = (挖掘 1 + 追加 4) 世界单位 x 每单位细格数");
                 Assert.AreEqual(10, recorder.Requests[0].CellX);
                 Assert.AreEqual(20, recorder.Requests[0].CellY);
             }

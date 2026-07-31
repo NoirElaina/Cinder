@@ -9,7 +9,8 @@ namespace Cinder.Simulation.Jobs
     /// 命中反应表且概率通过后，按 MatA/MatB 与格子实际物质匹配——产物落到正确
     /// 的格子上，与酸在固体的左/右/上/下无关（修复方位错配把石头变成酸的 bug）。
     /// 每个参与者单独结算：Cost&gt;0 的按 State 预算渐进消耗（耗尽才变成产物），
-    /// 否则立即按产物转变。处理全部格子——休眠区块内的静态岩浆池也必须持续反应。
+    /// 否则立即按产物转变。调度：醒块每 tick 处理；休眠块靠 FullPass
+    /// （每 8 tick 一次）全量补扫——静止岩浆池/酸仍持续反应，只是节奏放缓。
     /// </summary>
     [BurstCompile(CompileSynchronously = true)]
     public struct ReactionJob : IJob
@@ -18,23 +19,33 @@ namespace Cinder.Simulation.Jobs
         [ReadOnly] public NativeArray<ReactionRule> Reactions;
         [ReadOnly] public NativeArray<MaterialProps> Mats;
         public NativeArray<int> Moved;
+        [ReadOnly] public NativeArray<byte> Awake;
         public int Width;
         public int Height;
         public int ChunksX;
         public int TableCapacity;
         public uint Tick;
         public uint Seed;
+        /// <summary>非 0 = 本 tick 全量扫描（含休眠块）。</summary>
+        public byte FullPass;
 
         public void Execute()
         {
             for (int y = 0; y < Height; y++)
             {
-                for (int x = 0; x < Width; x++)
+                int chunkRow = (y >> SimCoords.ChunkShift) * ChunksX;
+                for (int cx = 0; cx < ChunksX; cx++)
                 {
-                    int i = y * Width + x;
-                    if (Cells[i].MaterialId == BuiltinMaterials.Empty) continue;
-                    TryReact(x, y, i, x + 1, y);
-                    TryReact(x, y, i, x, y + 1);
+                    if (FullPass == 0 && Awake[chunkRow + cx] == 0) continue;
+                    int x0 = cx << SimCoords.ChunkShift;
+                    int x1 = x0 + SimCoords.ChunkSize;
+                    for (int x = x0; x < x1; x++)
+                    {
+                        int i = y * Width + x;
+                        if (Cells[i].MaterialId == BuiltinMaterials.Empty) continue;
+                        TryReact(x, y, i, x + 1, y);
+                        TryReact(x, y, i, x, y + 1);
+                    }
                 }
             }
         }

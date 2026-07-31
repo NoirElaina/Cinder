@@ -63,6 +63,10 @@ namespace Cinder.Game.Effects
 
         public static EffectRequest Ignite(int cellX, int cellY, int radius) =>
             new EffectRequest(EffectKind.Ignite, cellX, cellY, radius, 0);
+
+        /// <summary>半径按倍数放大（世界单位授权 -> 细格执行），其余字段不变。</summary>
+        public EffectRequest ScaleRadius(int scale) =>
+            new EffectRequest(Kind, CellX, CellY, Radius * scale, Amount);
     }
 
     /// <summary>

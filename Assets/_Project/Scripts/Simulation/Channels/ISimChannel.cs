@@ -13,6 +13,8 @@ namespace Cinder.Simulation
         public NativeArray<MaterialProps> Mats;
         public NativeArray<ReactionRule> Reactions;
         public NativeArray<int> Moved;
+        /// <summary>每区块醒/眠（SimulationWindow.ChunkAwake），通道 Job 据此跳过休眠区块。</summary>
+        public NativeArray<byte> Awake;
         public int Width;
         public int Height;
         public int ChunksX;
